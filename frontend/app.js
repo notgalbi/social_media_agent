@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000";
+const API_URL = "https://socialmediaagent-production-83c2.up.railway.app";
 
 const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 
