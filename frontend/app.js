@@ -1,5 +1,39 @@
 const API_URL = "https://socialmediaagent-production-83c2.up.railway.app";
 
+// ── Particle background ──
+function spawnParticles() {
+  const container = document.getElementById("particles");
+  const colors = ["#f7c5d2", "#e8b97a", "#c8e6c8", "#f0dde5", "#fde8ed"];
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement("div");
+    p.className = "particle";
+    const size = Math.random() * 10 + 4;
+    p.style.cssText = `
+      width: ${size}px; height: ${size}px;
+      left: ${Math.random() * 100}%;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      animation-duration: ${Math.random() * 12 + 10}s;
+      animation-delay: ${Math.random() * 10}s;
+    `;
+    container.appendChild(p);
+  }
+}
+spawnParticles();
+
+// ── Animated screen transitions ──
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => {
+    if (!s.classList.contains("hidden")) {
+      s.classList.add("hidden");
+    }
+  });
+  const next = document.getElementById(id);
+  next.classList.remove("hidden");
+  next.classList.remove("enter");
+  void next.offsetWidth;
+  next.classList.add("enter");
+}
+
 const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 
 let selectedFile = null;
@@ -41,6 +75,8 @@ async function initApp() {
 function enterApp(username) {
   document.getElementById("main-header").classList.remove("hidden");
   document.getElementById("connected-name").textContent = username ? `@${username}` : "Instagram connected";
+  const pill = document.getElementById("user-pill");
+  if (username) pill.textContent = `@${username}`;
   showScreen("screen-upload");
 }
 
@@ -78,11 +114,7 @@ const btnPost = document.getElementById("btn-post");
 const btnBack = document.getElementById("btn-back");
 const btnNew = document.getElementById("btn-new");
 
-// Screens
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
-}
+// showScreen is defined above with animation logic
 
 // Upload interactions
 uploadArea.addEventListener("click", () => fileInput.click());
@@ -225,6 +257,8 @@ function renderCaptions(captions) {
     `;
     card.addEventListener("click", () => selectCaption(card, text));
     captionList.appendChild(card);
+    // staggered entrance
+    setTimeout(() => card.classList.add("visible"), i * 120);
   });
 }
 

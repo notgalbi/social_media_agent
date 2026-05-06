@@ -1,7 +1,7 @@
 {
-  "name": "Galbi & Grano",
-  "short_name": "G&G",
-  "description": "Instagram caption generator for healthy Korean-Italian fusion",
+  "name": "Captionly",
+  "short_name": "Captionly",
+  "description": "AI Instagram caption generator for any creator",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0f0f",

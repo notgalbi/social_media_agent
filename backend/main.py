@@ -58,15 +58,15 @@ app.mount("/media", StaticFiles(directory=str(UPLOADS_DIR)), name="media")
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 BRAND_CONTEXT = """
-You are a social media caption writer for a healthy food brand based in Las Vegas.
-The brand makes bold, flavorful meals that are nutritious and macro-friendly.
-Audience: health-conscious Vegas locals, fitness community, busy professionals aged 25-45.
-Tone: confident, fun, food-passionate. Not overly formal. Minimal emojis unless it fits.
-Always end captions with a soft call to action toward meal prep bookings or DM inquiries.
+You are an expert Instagram caption writer for any type of creator or brand.
+You write captions that feel native to Instagram — natural, engaging, and on-brand.
 
-IMPORTANT: Write captions specifically about what you see in the image — the actual dish, ingredients, colors, and presentation.
-Do not default to a generic theme. Make the caption feel like it was written for that exact photo.
-You must ALWAYS respond with exactly 3 captions in the required format. Never refuse or ask for clarification.
+IMPORTANT RULES:
+- Write captions specifically about what you see in the image — the subject, mood, colors, setting, and details.
+- Adapt your tone to match the content: lifestyle, fashion, food, fitness, travel, beauty, art — whatever it is.
+- If example captions from the creator's profile are provided, match their exact voice, vocabulary, punctuation, and emoji style.
+- You must ALWAYS respond with exactly 3 captions and 3 music suggestions in the required format.
+- Never refuse or ask for clarification. Always generate captions based on what you see.
 """
 
 
@@ -171,15 +171,15 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg") 
     content.append({
         "type": "text",
         "text": (
-            "Look closely at this image and write 3 Instagram captions specifically about what you see — "
-            "the dish, ingredients, textures, colors, and presentation. "
-            "Match the voice style of the example captions exactly if provided.\n\n"
+            "Look closely at this image and write 3 Instagram captions based on what you see — "
+            "the subject, mood, colors, setting, and details. "
+            "Match the creator's voice exactly if example captions are provided.\n\n"
             "Caption styles:\n"
-            "1. Casual and relatable — describe the food naturally in the creator's voice\n"
-            "2. Engaging — hook or question based on the specific dish\n"
-            "3. Call to action — reference the dish and invite a DM or booking\n\n"
-            "Then suggest 3 real songs from Instagram's music library that match the vibe, "
-            "mood, and energy of this food content. Think about the aesthetic, colors, and feeling.\n\n"
+            "1. Casual and relatable — feels natural and personal\n"
+            "2. Engaging — a hook, question, or reaction that invites comments\n"
+            "3. Bold statement or call to action — confident and direct\n\n"
+            "Then suggest 3 real trending songs from Instagram's music library that match the "
+            "vibe, aesthetic, and energy of this content.\n\n"
             "Format your response EXACTLY as:\n"
             "CAPTION_1: [caption]\n"
             "CAPTION_2: [caption]\n"
