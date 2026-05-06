@@ -612,13 +612,13 @@ btnPost.addEventListener("click", async () => {
     bufferConnected = data.connected;
   } catch {}
 
-  if (bufferConnected && selectedFile) {
+  if (bufferConnected && selectedFiles.length) {
     btnPost.disabled = true;
     btnPost.textContent = "Posting...";
     try {
       // upload the media file first
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", selectedFiles[0]);
       const uploadRes = await fetch(`${API_URL}/upload-media`, {
         method: "POST",
         body: formData,
