@@ -292,123 +292,64 @@ const btnSaveCaptions = document.getElementById("btn-save-captions");
 const manualCaptions  = document.getElementById("manual-captions");
 const manualStatus    = document.getElementById("manual-status");
 const syncStatus      = document.getElementById("sync-status");
-
-// Step elements
-const igToken         = document.getElementById("ig-token");
-const step1           = document.getElementById("setup-step-1");
-const step2           = document.getElementById("setup-step-2");
-const step3           = document.getElementById("setup-step-3");
+const setupConnect    = document.getElementById("setup-connect");
 const setupConnected  = document.getElementById("setup-connected");
-const profileList     = document.getElementById("profile-list");
 const connectedName   = document.getElementById("connected-name");
 
-let pendingToken = "";
+// Set Instagram login URL
+document.getElementById("btn-instagram-login").href = `${API_URL}/auth/instagram`;
 
-function setStep(n) {
-  [step1, step2, step3, setupConnected].forEach(el => el.classList.add("hidden"));
-  [1,2,3].forEach(i => {
-    const dot = document.getElementById(`step-dot-${i}`);
-    dot.classList.toggle("active", i === n);
-    dot.classList.toggle("done", i < n);
-  });
-  if (n === "connected") {
-    setupConnected.classList.remove("hidden");
-    document.getElementById("setup-steps").classList.add("hidden");
-  } else {
-    document.getElementById("setup-steps").classList.remove("hidden");
-    document.getElementById(`setup-step-${n}`).classList.remove("hidden");
-  }
+// Check for auth callback params on load
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get("auth") === "success") {
+  const username = urlParams.get("username");
+  showConnected(username);
+  history.replaceState({}, "", window.location.pathname);
+} else if (urlParams.get("auth") === "error") {
+  alert("Instagram connection failed. Please try again.");
+  history.replaceState({}, "", window.location.pathname);
+}
+
+function showConnected(username) {
+  setupConnect.classList.add("hidden");
+  setupConnected.classList.remove("hidden");
+  connectedName.textContent = username ? `@${username}` : "Instagram connected";
+}
+
+function showDisconnected() {
+  setupConnected.classList.add("hidden");
+  setupConnect.classList.remove("hidden");
 }
 
 btnSettings.addEventListener("click", async () => {
   showScreen("screen-settings");
 
-  // load captions
+  // load captions into textarea
   try {
     const res = await fetch(`${API_URL}/settings/captions`);
     const data = await res.json();
     if (data.captions?.length) manualCaptions.value = data.captions.join("\n");
   } catch {}
 
-  // check if already connected
+  // check Instagram connection status
   try {
-    const res = await fetch(`${API_URL}/settings/buffer`);
+    const res = await fetch(`${API_URL}/auth/status`);
     const data = await res.json();
     if (data.connected) {
-      connectedName.textContent = data.username || "Instagram connected";
-      setStep("connected");
-      return;
+      showConnected(data.username);
+    } else {
+      showDisconnected();
     }
-  } catch {}
-
-  setStep(1);
+  } catch {
+    showDisconnected();
+  }
 });
 
 btnSettingsBack.addEventListener("click", () => showScreen("screen-upload"));
 
-// Step 1: token input → enable next
-igToken.addEventListener("input", () => {
-  document.getElementById("btn-step1-next").disabled = igToken.value.trim().length < 10;
-});
-
-document.getElementById("btn-step1-next").addEventListener("click", () => {
-  pendingToken = igToken.value.trim();
-  setStep(2);
-});
-
-document.getElementById("btn-step2-next").addEventListener("click", () => setStep(3));
-document.getElementById("btn-step2-back").addEventListener("click", () => setStep(1));
-document.getElementById("btn-step3-back").addEventListener("click", () => setStep(2));
-
-// Step 3: fetch Instagram profiles from Buffer
-document.getElementById("btn-fetch-profiles").addEventListener("click", async () => {
-  showStatus(syncStatus, "Fetching profiles...");
-  try {
-    const res = await fetch(`${API_URL}/settings/buffer/profiles?access_token=${encodeURIComponent(pendingToken)}`);
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.detail || "Could not fetch profiles");
-    if (!data.profiles.length) throw new Error("No Instagram accounts found in Buffer. Connect one first.");
-
-    profileList.innerHTML = "";
-    data.profiles.forEach(p => {
-      const btn = document.createElement("button");
-      btn.className = "btn-profile";
-      btn.textContent = `@${p.name}`;
-      btn.addEventListener("click", () => saveBuffer(p.id, p.name));
-      profileList.appendChild(btn);
-    });
-
-    profileList.classList.remove("hidden");
-    syncStatus.classList.add("hidden");
-  } catch (err) {
-    showStatus(syncStatus, err.message);
-  }
-});
-
-async function saveBuffer(profileId, username) {
-  const res = await fetch(`${API_URL}/settings/buffer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ access_token: pendingToken, profile_id: profileId }),
-  });
-  if (res.ok) {
-    connectedName.textContent = `@${username}`;
-    setStep("connected");
-  } else {
-    showStatus(syncStatus, "Failed to save — try again");
-  }
-}
-
 document.getElementById("btn-disconnect").addEventListener("click", async () => {
-  await fetch(`${API_URL}/settings/buffer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ access_token: "", profile_id: "" }),
-  });
-  igToken.value = "";
-  pendingToken = "";
-  setStep(1);
+  await fetch(`${API_URL}/auth/logout`, { method: "POST" });
+  showDisconnected();
 });
 
 // Save manually pasted captions

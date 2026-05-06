@@ -5,8 +5,10 @@ import uuid
 import base64
 import logging
 import tempfile
+import secrets
 from pathlib import Path
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 import httpx
 import anthropic
@@ -14,6 +16,7 @@ import cv2
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -28,6 +31,14 @@ log = logging.getLogger(__name__)
 STORE_PATH = Path(__file__).parent / "captions_store.json"
 UPLOADS_DIR = Path(__file__).parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
+
+META_APP_ID     = os.getenv("META_APP_ID", "")
+META_APP_SECRET = os.getenv("META_APP_SECRET", "")
+BACKEND_URL     = os.getenv("PUBLIC_URL", "http://localhost:8000")
+FRONTEND_URL    = os.getenv("FRONTEND_URL", "http://localhost:3000")
+REDIRECT_URI    = f"{BACKEND_URL}/auth/callback"
+
+IG_SCOPES = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
 
 app = FastAPI()
 
@@ -376,6 +387,142 @@ async def post_to_instagram(payload: PostPayload):
         raise HTTPException(status_code=502, detail=f"Buffer error: {res.text}")
 
     return {"status": "posted", "buffer_response": res.json()}
+
+
+# ── Instagram OAuth ──
+
+@app.get("/auth/instagram")
+async def instagram_login():
+    """Redirect user to Instagram/Facebook login."""
+    state = secrets.token_urlsafe(16)
+    params = urlencode({
+        "client_id": META_APP_ID,
+        "redirect_uri": REDIRECT_URI,
+        "scope": IG_SCOPES,
+        "response_type": "code",
+        "state": state,
+    })
+    return RedirectResponse(f"https://www.facebook.com/dialog/oauth?{params}")
+
+
+@app.get("/auth/callback")
+async def instagram_callback(code: str = None, error: str = None):
+    """Handle OAuth callback from Meta."""
+    if error or not code:
+        log.error(f"OAuth error: {error}")
+        return RedirectResponse(f"{FRONTEND_URL}?auth=error")
+
+    # Exchange code for access token
+    async with httpx.AsyncClient() as http:
+        token_res = await http.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={
+                "client_id": META_APP_ID,
+                "client_secret": META_APP_SECRET,
+                "redirect_uri": REDIRECT_URI,
+                "code": code,
+            },
+        )
+
+    if token_res.status_code != 200:
+        log.error(f"Token exchange failed: {token_res.text}")
+        return RedirectResponse(f"{FRONTEND_URL}?auth=error")
+
+    token_data = token_res.json()
+    access_token = token_data.get("access_token")
+
+    # Get long-lived token
+    async with httpx.AsyncClient() as http:
+        long_res = await http.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={
+                "grant_type": "fb_exchange_token",
+                "client_id": META_APP_ID,
+                "client_secret": META_APP_SECRET,
+                "fb_exchange_token": access_token,
+            },
+        )
+    if long_res.status_code == 200:
+        access_token = long_res.json().get("access_token", access_token)
+
+    # Get Facebook pages to find linked Instagram account
+    async with httpx.AsyncClient() as http:
+        pages_res = await http.get(
+            "https://graph.facebook.com/v19.0/me/accounts",
+            params={"access_token": access_token, "fields": "id,name,instagram_business_account"},
+        )
+
+    ig_user_id = None
+    ig_token = access_token
+    ig_username = ""
+
+    if pages_res.status_code == 200:
+        pages = pages_res.json().get("data", [])
+        for page in pages:
+            ig = page.get("instagram_business_account")
+            if ig:
+                ig_user_id = ig.get("id")
+                # Get username
+                async with httpx.AsyncClient() as http:
+                    info_res = await http.get(
+                        f"https://graph.facebook.com/v19.0/{ig_user_id}",
+                        params={"fields": "username", "access_token": access_token},
+                    )
+                if info_res.status_code == 200:
+                    ig_username = info_res.json().get("username", "")
+                break
+
+    store = load_store()
+    store["instagram_access_token"] = ig_token
+    store["instagram_user_id"] = ig_user_id or ""
+    store["instagram_username"] = ig_username
+    store["facebook_access_token"] = access_token
+    save_store(store)
+
+    # Auto-sync recent captions to train Claude on their voice
+    if ig_user_id:
+        try:
+            async with httpx.AsyncClient() as http:
+                media_res = await http.get(
+                    f"https://graph.facebook.com/v19.0/{ig_user_id}/media",
+                    params={"fields": "caption", "access_token": access_token, "limit": 20},
+                )
+            if media_res.status_code == 200:
+                captions = [
+                    p["caption"] for p in media_res.json().get("data", [])
+                    if p.get("caption", "").strip()
+                ]
+                if captions:
+                    store["example_captions"] = captions
+                    save_store(store)
+                    log.info(f"Auto-synced {len(captions)} captions for @{ig_username}")
+        except Exception as e:
+            log.warning(f"Caption sync failed: {e}")
+
+    log.info(f"Instagram connected: @{ig_username} (id={ig_user_id})")
+    return RedirectResponse(f"{FRONTEND_URL}?auth=success&username={ig_username}")
+
+
+@app.get("/auth/status")
+async def auth_status():
+    store = load_store()
+    connected = bool(store.get("instagram_user_id"))
+    return {
+        "connected": connected,
+        "username": store.get("instagram_username", ""),
+    }
+
+
+@app.post("/auth/logout")
+async def auth_logout():
+    store = load_store()
+    store["instagram_access_token"] = ""
+    store["instagram_user_id"] = ""
+    store["instagram_username"] = ""
+    store["facebook_access_token"] = ""
+    store["example_captions"] = []
+    save_store(store)
+    return {"status": "logged out"}
 
 
 async def _fetch_ig_captions_from_buffer(token: str, profile_id: str) -> list[str]:

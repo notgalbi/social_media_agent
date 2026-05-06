@@ -850,6 +850,32 @@ textarea::placeholder { color: var(--muted); }
   box-shadow: var(--shadow);
 }
 
+/* ── Instagram login button ── */
+.btn-instagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 6px 20px rgba(220, 39, 67, 0.35);
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-instagram:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(220, 39, 67, 0.45);
+}
+
 /* ── Connected badge ── */
 .connected-badge {
   font-size: 17px;
