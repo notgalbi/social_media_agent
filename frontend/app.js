@@ -129,6 +129,7 @@ btnGenerate.addEventListener("click", async () => {
     const data = await res.json();
     clearInterval(msgInterval);
     renderCaptions(data.captions);
+    renderMusic(data.music || []);
     showScreen("screen-captions");
   } catch (err) {
     clearInterval(msgInterval);
@@ -139,6 +140,39 @@ btnGenerate.addEventListener("click", async () => {
     showScreen("screen-upload");
   }
 });
+
+function renderMusic(music) {
+  const wrap = document.getElementById("music-wrap");
+  const list = document.getElementById("music-list");
+  list.innerHTML = "";
+
+  if (!music || !music.length) {
+    wrap.classList.add("hidden");
+    return;
+  }
+
+  music.forEach((track, i) => {
+    const el = document.createElement("div");
+    el.className = "music-card";
+    el.innerHTML = `
+      <div class="music-num">${i + 1}</div>
+      <div class="music-info">
+        <div class="music-song">${track.song}</div>
+        <div class="music-artist">${track.artist}</div>
+      </div>
+      <button class="music-copy" title="Copy song name" data-text="${track.artist} - ${track.song}">⎘</button>
+    `;
+    el.querySelector(".music-copy").addEventListener("click", async (e) => {
+      const text = e.currentTarget.dataset.text;
+      try { await navigator.clipboard.writeText(text); } catch {}
+      e.currentTarget.textContent = "✓";
+      setTimeout(() => e.currentTarget.textContent = "⎘", 2000);
+    });
+    list.appendChild(el);
+  });
+
+  wrap.classList.remove("hidden");
+}
 
 function renderCaptions(captions) {
   captionList.innerHTML = "";

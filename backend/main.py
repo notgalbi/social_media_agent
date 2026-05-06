@@ -111,17 +111,43 @@ def extract_frames(video_path: str, num_frames: int = 3) -> list[str]:
 def build_style_block(example_captions: list[str]) -> str:
     if not example_captions:
         return ""
-    samples = "\n".join(f'- "{c}"' for c in example_captions[:10])
+    samples = "\n".join(f'- "{c}"' for c in example_captions[:15])
     return (
-        f"\n\nHere are real captions from this brand's Instagram profile. "
-        f"Study the voice, sentence length, tone, and style — then match it exactly:\n{samples}\n"
+        f"\n\nIMPORTANT — Voice matching: Here are real captions from this creator's Instagram profile. "
+        f"Study the exact vocabulary, sentence length, punctuation style, emoji usage, and tone. "
+        f"Your captions must sound like they were written by the same person:\n{samples}\n"
     )
 
 
-def generate_captions(image_b64_list: list[str], media_type: str = "image/jpeg") -> list[str]:
+def parse_captions(raw: str) -> list[str]:
+    captions = re.findall(r"CAPTION_\d:\s*(.+?)(?=CAPTION_\d:|MUSIC_|$)", raw, re.DOTALL)
+    captions = [c.strip() for c in captions if c.strip()]
+
+    if len(captions) < 3:
+        captions = re.findall(r"(?:^|\n)\s*\d[.:]\s*(.+)", raw)
+        captions = [c.strip() for c in captions if c.strip()]
+
+    if len(captions) < 3:
+        lines = [l.strip() for l in raw.strip().split("\n") if l.strip()
+                 and not l.strip().startswith("MUSIC")]
+        captions = lines[:3]
+
+    while len(captions) < 3:
+        captions.append("Fresh, bold, and built for your goals. DM us to book your weekly meal prep.")
+
+    return captions[:3]
+
+
+def parse_music(raw: str) -> list[dict]:
+    music = []
+    for m in re.finditer(r"MUSIC_\d:\s*(.+?)\s*[-–]\s*(.+?)(?=MUSIC_\d:|$)", raw, re.DOTALL):
+        music.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
+    return music[:3]
+
+
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg") -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
-
     system = BRAND_CONTEXT + style_block
 
     content = []
@@ -135,43 +161,40 @@ def generate_captions(image_b64_list: list[str], media_type: str = "image/jpeg")
         "type": "text",
         "text": (
             "Look closely at this image and write 3 Instagram captions specifically about what you see — "
-            "the dish, ingredients, textures, colors, and presentation.\n\n"
+            "the dish, ingredients, textures, colors, and presentation. "
+            "Match the voice style of the example captions exactly if provided.\n\n"
             "Caption styles:\n"
-            "1. Casual and relatable — describe the food naturally\n"
-            "2. Engaging — ask a question or write a hook based on the dish\n"
-            "3. Call to action — reference the specific dish and invite a DM or booking\n\n"
-            "Format your response as:\n"
+            "1. Casual and relatable — describe the food naturally in the creator's voice\n"
+            "2. Engaging — hook or question based on the specific dish\n"
+            "3. Call to action — reference the dish and invite a DM or booking\n\n"
+            "Then suggest 3 real songs from Instagram's music library that match the vibe, "
+            "mood, and energy of this food content. Think about the aesthetic, colors, and feeling.\n\n"
+            "Format your response EXACTLY as:\n"
             "CAPTION_1: [caption]\n"
             "CAPTION_2: [caption]\n"
-            "CAPTION_3: [caption]\n\n"
-            "Keep each caption under 150 characters. No hashtags in the caption body."
+            "CAPTION_3: [caption]\n"
+            "MUSIC_1: [Artist] - [Song Title]\n"
+            "MUSIC_2: [Artist] - [Song Title]\n"
+            "MUSIC_3: [Artist] - [Song Title]\n\n"
+            "Keep each caption under 150 characters. No hashtags in caption body. "
+            "Only suggest real, well-known songs available on Instagram."
         )
     })
 
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=500,
+        max_tokens=700,
         system=system,
         messages=[{"role": "user", "content": content}],
     )
 
     raw = message.content[0].text
+    log.info(f"Raw Claude response:\n{raw}")
 
-    captions = re.findall(r"CAPTION_\d:\s*(.+?)(?=CAPTION_\d:|$)", raw, re.DOTALL)
-    captions = [c.strip() for c in captions if c.strip()]
-
-    if len(captions) < 3:
-        captions = re.findall(r"(?:^|\n)\s*\d[.:]\s*(.+)", raw)
-        captions = [c.strip() for c in captions if c.strip()]
-
-    if len(captions) < 3:
-        lines = [l.strip() for l in raw.strip().split("\n") if l.strip()]
-        captions = lines[:3]
-
-    while len(captions) < 3:
-        captions.append("Fresh, bold, and built for your goals. DM us to book your weekly meal prep.")
-
-    return captions[:3]
+    return {
+        "captions": parse_captions(raw),
+        "music": parse_music(raw),
+    }
 
 
 # --- Routes ---
@@ -195,10 +218,10 @@ async def generate_captions_endpoint(file: UploadFile = File(...)):
             base64.b64encode(open(tmp_path, "rb").read()).decode("utf-8")
         ]
         media_type = "image/jpeg" if is_video else f"image/{suffix.lstrip('.')}"
-        log.info(f"Generating captions for {media_type}")
-        captions = generate_captions(frames, media_type)
-        log.info(f"Captions generated successfully: {captions}")
-        return {"captions": captions}
+        log.info(f"Generating captions + music for {media_type}")
+        result = generate_content(frames, media_type)
+        log.info(f"Generated: {result}")
+        return result
     except Exception as e:
         log.error(f"Caption generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
