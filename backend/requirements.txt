@@ -7,3 +7,4 @@ python-multipart==0.0.9
 opencv-python-headless==4.10.0.84
 python-dotenv==1.0.1
 pydantic==2.8.2
+Pillow==10.4.0

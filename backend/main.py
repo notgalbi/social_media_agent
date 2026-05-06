@@ -102,6 +102,34 @@ class PostPayload(BaseModel):
 
 # --- Video/image helpers ---
 
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB — stay under Claude's 5 MB hard limit
+
+
+def compress_to_b64(img_bytes: bytes, max_bytes: int = MAX_IMAGE_BYTES) -> str:
+    """Resize + re-encode image until it fits under max_bytes."""
+    import io
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    quality = 85
+    scale = 1.0
+
+    while True:
+        buf = io.BytesIO()
+        w = int(img.width * scale)
+        h = int(img.height * scale)
+        resized = img.resize((w, h), Image.LANCZOS) if scale < 1.0 else img
+        resized.save(buf, format="JPEG", quality=quality)
+        data = buf.getvalue()
+        if len(data) <= max_bytes:
+            return base64.b64encode(data).decode("utf-8")
+        # Try reducing quality first, then scale down
+        if quality > 60:
+            quality -= 10
+        else:
+            scale *= 0.75
+
+
 def extract_frames(video_path: str, num_frames: int = 3) -> list[str]:
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -112,7 +140,7 @@ def extract_frames(video_path: str, num_frames: int = 3) -> list[str]:
         ret, frame = cap.read()
         if ret:
             _, buffer = cv2.imencode(".jpg", frame)
-            frames_b64.append(base64.b64encode(buffer).decode("utf-8"))
+            frames_b64.append(compress_to_b64(bytes(buffer)))
     cap.release()
     return frames_b64
 
@@ -250,8 +278,8 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...)):
             all_frames.extend(extract_frames(tmp.name, num_frames=frames_per_video))
             last_media_type = "image/jpeg"
         else:
-            all_frames.append(base64.b64encode(open(tmp.name, "rb").read()).decode("utf-8"))
-            last_media_type = ext_to_mime.get(suffix, "image/jpeg")
+            all_frames.append(compress_to_b64(open(tmp.name, "rb").read()))
+            last_media_type = "image/jpeg"  # compress_to_b64 always outputs JPEG
 
     if not all_frames:
         raise HTTPException(status_code=400, detail="No supported files found")
