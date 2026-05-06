@@ -3,19 +3,27 @@ import re
 import json
 import uuid
 import base64
+import logging
 import tempfile
 from pathlib import Path
+from datetime import datetime, timezone
 
 import httpx
 import anthropic
 import cv2
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger(__name__)
 
 STORE_PATH = Path(__file__).parent / "captions_store.json"
 UPLOADS_DIR = Path(__file__).parent / "uploads"
@@ -182,12 +190,18 @@ async def generate_captions_endpoint(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
+        log.info(f"Processing file: {file.filename} ({suffix})")
         frames = extract_frames(tmp_path) if is_video else [
             base64.b64encode(open(tmp_path, "rb").read()).decode("utf-8")
         ]
         media_type = "image/jpeg" if is_video else f"image/{suffix.lstrip('.')}"
+        log.info(f"Generating captions for {media_type}")
         captions = generate_captions(frames, media_type)
+        log.info(f"Captions generated successfully: {captions}")
         return {"captions": captions}
+    except Exception as e:
+        log.error(f"Caption generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         os.unlink(tmp_path)
 
@@ -271,6 +285,21 @@ async def save_buffer_token(payload: BufferTokenPayload):
     store["buffer_access_token"] = payload.access_token
     store["buffer_profile_id"] = payload.profile_id
     save_store(store)
+    log.info(f"Buffer connected: profile_id={payload.profile_id}")
+
+    # auto-sync Instagram captions to train Claude on their voice
+    if payload.access_token and payload.profile_id:
+        try:
+            ig_captions = await _fetch_ig_captions_from_buffer(
+                payload.access_token, payload.profile_id
+            )
+            if ig_captions:
+                store["example_captions"] = ig_captions
+                save_store(store)
+                log.info(f"Auto-synced {len(ig_captions)} captions from Instagram profile")
+        except Exception as e:
+            log.warning(f"Auto-sync captions failed (non-fatal): {e}")
+
     return {"status": "saved"}
 
 
@@ -326,6 +355,46 @@ async def post_to_instagram(payload: PostPayload):
     return {"status": "posted", "buffer_response": res.json()}
 
 
+async def _fetch_ig_captions_from_buffer(token: str, profile_id: str) -> list[str]:
+    """Pull recent post captions from Instagram via Buffer to train Claude's voice."""
+    async with httpx.AsyncClient() as http:
+        res = await http.get(
+            f"https://api.bufferapp.com/1/profiles/{profile_id}/updates/sent.json",
+            params={"access_token": token, "count": 20},
+        )
+    if res.status_code != 200:
+        return []
+    updates = res.json().get("updates", [])
+    return [u["text"] for u in updates if u.get("text", "").strip()]
+
+
+# Logs endpoint so you can see what's happening
+LOG_ENTRIES: list[dict] = []
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = datetime.now(timezone.utc)
+    response = await call_next(request)
+    duration = (datetime.now(timezone.utc) - start).total_seconds()
+    entry = {
+        "time": start.isoformat(),
+        "method": request.method,
+        "path": request.url.path,
+        "status": response.status_code,
+        "duration_s": round(duration, 3),
+    }
+    LOG_ENTRIES.append(entry)
+    if len(LOG_ENTRIES) > 200:
+        LOG_ENTRIES.pop(0)
+    log.info(f"{request.method} {request.url.path} → {response.status_code} ({duration:.2f}s)")
+    return response
+
+
+@app.get("/logs")
+def get_logs():
+    return {"logs": list(reversed(LOG_ENTRIES))}
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
