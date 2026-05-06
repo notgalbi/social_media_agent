@@ -882,6 +882,129 @@ body::before {
 
 .btn-add-song:hover { background: var(--accent-dark); transform: scale(1.1); }
 
+/* ── Post Preview ── */
+.preview-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.ig-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.ig-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.ig-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-light), var(--accent));
+  flex-shrink: 0;
+}
+
+.ig-username {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+
+.ig-more {
+  font-size: 18px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.ig-media-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.ig-media-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ig-carousel-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+}
+
+.ig-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+}
+
+.ig-actions-left { display: flex; gap: 14px; }
+
+.ig-btn {
+  font-size: 22px;
+  cursor: default;
+  line-height: 1;
+  transition: transform 0.15s;
+  color: var(--text);
+}
+
+.ig-heart { color: var(--text); }
+.ig-heart:hover { transform: scale(1.2); }
+.ig-save { color: var(--text); }
+
+.ig-caption-preview {
+  padding: 2px 14px 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.ig-cap-user {
+  font-weight: 700;
+  margin-right: 5px;
+}
+
+.ig-cap-text {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.ig-time {
+  padding: 0 14px 12px;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
 /* ── Edit area ── */
 .selected-wrap {
   display: flex;

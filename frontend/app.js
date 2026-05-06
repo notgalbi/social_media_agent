@@ -606,12 +606,37 @@ function selectCaption(card, text) {
   card.classList.add("selected");
   selectedCaption = text;
   captionEdit.value = text;
+  updatePostPreview(text);
   selectedWrap.classList.remove("hidden");
   selectedWrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+function updatePostPreview(text) {
+  const preview = document.getElementById("post-preview");
+  const mediaImg = document.getElementById("ig-media-img");
+  const capText = document.getElementById("ig-cap-text");
+  const badge = document.getElementById("ig-carousel-badge");
+
+  if (selectedFiles.length) {
+    const firstFile = selectedFiles[0];
+    mediaImg.src = URL.createObjectURL(firstFile);
+
+    if (selectedFiles.length > 1) {
+      badge.textContent = `1 / ${selectedFiles.length}`;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  }
+
+  capText.textContent = " " + text;
+  preview.classList.remove("hidden");
+}
+
 captionEdit.addEventListener("input", () => {
   selectedCaption = captionEdit.value;
+  const capText = document.getElementById("ig-cap-text");
+  if (capText) capText.textContent = " " + captionEdit.value;
 });
 
 // Post via Buffer or copy to clipboard
@@ -691,6 +716,7 @@ btnNew.addEventListener("click", () => {
   captionEdit.value = "";
   captionList.innerHTML = "";
   selectedWrap.classList.add("hidden");
+  document.getElementById("post-preview").classList.add("hidden");
   showScreen("screen-upload");
 });
 
