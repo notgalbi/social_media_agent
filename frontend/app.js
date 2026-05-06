@@ -513,38 +513,52 @@ async function handlePreview(btn, artist, song) {
 
   if (currentAudio) {
     currentAudio.pause();
-    currentAudio = null;
     if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); }
+    currentAudio = null;
+    currentPreviewBtn = null;
   }
 
   btn.textContent = "…";
 
+  // Create Audio element synchronously (before any await) so iOS Safari
+  // keeps the user-gesture context alive for the later .play() call
+  const audio = new Audio();
+  audio.preload = "auto";
+  currentAudio = audio;
+  currentPreviewBtn = btn;
+
   try {
-    const q = encodeURIComponent(`${artist} ${song}`);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(artist + " " + song)}&media=music&limit=1`,
+      { signal: controller.signal }
+    );
     const data = await res.json();
     const url = data.results?.[0]?.previewUrl;
 
-    if (!url) {
+    if (!url || currentAudio !== audio) {
       btn.textContent = "—";
       setTimeout(() => btn.textContent = "▶", 2000);
+      if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
       return;
     }
 
-    currentAudio = new Audio(url);
-    currentPreviewBtn = btn;
-    await currentAudio.play();
+    audio.src = url;
+    audio.load();
+    await audio.play();
     btn.textContent = "⏸";
     btn.classList.add("playing");
 
-    currentAudio.addEventListener("ended", () => {
+    audio.addEventListener("ended", () => {
       btn.textContent = "▶";
       btn.classList.remove("playing");
-      currentAudio = null;
-      currentPreviewBtn = null;
+      if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
     });
   } catch {
     btn.textContent = "▶";
+    btn.classList.remove("playing");
+    if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
   }
 }
 
