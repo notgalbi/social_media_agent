@@ -444,27 +444,44 @@ btnGenerate.addEventListener("click", async () => {
   }
 });
 
+let currentMusicItems = [];
+let currentAudio = null;
+let currentPreviewBtn = null;
+
 function renderMusic(music) {
+  currentMusicItems = music ? [...music] : [];
+  _drawMusicList();
+}
+
+function _drawMusicList() {
   const wrap = document.getElementById("music-wrap");
   const list = document.getElementById("music-list");
   list.innerHTML = "";
 
-  if (!music || !music.length) {
+  if (!currentMusicItems.length) {
     wrap.classList.add("hidden");
     return;
   }
 
-  music.forEach((track, i) => {
+  currentMusicItems.forEach((track, i) => {
     const el = document.createElement("div");
     el.className = "music-card";
+
+    const song = track.song.replace(/"/g, "&quot;");
+    const artist = track.artist.replace(/"/g, "&quot;");
     el.innerHTML = `
       <div class="music-num">${i + 1}</div>
       <div class="music-info">
         <div class="music-song">${track.song}</div>
         <div class="music-artist">${track.artist}</div>
       </div>
-      <button class="music-copy" title="Copy song name" data-text="${track.artist} - ${track.song}">⎘</button>
+      <button class="music-preview" title="Preview 30s">▶</button>
+      <button class="music-copy" title="Copy" data-text="${artist} - ${song}">⎘</button>
     `;
+
+    const previewBtn = el.querySelector(".music-preview");
+    previewBtn.addEventListener("click", () => handlePreview(previewBtn, track.artist, track.song));
+
     el.querySelector(".music-copy").addEventListener("click", async (e) => {
       playSound("music-copy");
       const text = e.currentTarget.dataset.text;
@@ -472,11 +489,83 @@ function renderMusic(music) {
       e.currentTarget.textContent = "✓";
       setTimeout(() => e.currentTarget.textContent = "⎘", 2000);
     });
+
     list.appendChild(el);
   });
 
   wrap.classList.remove("hidden");
 }
+
+async function handlePreview(btn, artist, song) {
+  if (currentPreviewBtn === btn && currentAudio) {
+    if (currentAudio.paused) {
+      currentAudio.play();
+      btn.textContent = "⏸";
+      btn.classList.add("playing");
+    } else {
+      currentAudio.pause();
+      btn.textContent = "▶";
+      btn.classList.remove("playing");
+    }
+    return;
+  }
+
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+    if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); }
+  }
+
+  btn.textContent = "…";
+
+  try {
+    const q = encodeURIComponent(`${artist} ${song}`);
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
+    const data = await res.json();
+    const url = data.results?.[0]?.previewUrl;
+
+    if (!url) {
+      btn.textContent = "—";
+      setTimeout(() => btn.textContent = "▶", 2000);
+      return;
+    }
+
+    currentAudio = new Audio(url);
+    currentPreviewBtn = btn;
+    await currentAudio.play();
+    btn.textContent = "⏸";
+    btn.classList.add("playing");
+
+    currentAudio.addEventListener("ended", () => {
+      btn.textContent = "▶";
+      btn.classList.remove("playing");
+      currentAudio = null;
+      currentPreviewBtn = null;
+    });
+  } catch {
+    btn.textContent = "▶";
+  }
+}
+
+// Custom song input
+document.getElementById("btn-add-song").addEventListener("click", () => {
+  const input = document.getElementById("custom-song-input");
+  const val = input.value.trim();
+  if (!val) return;
+
+  const parts = val.split(/\s*[—–-]\s*/);
+  const artist = parts.length >= 2 ? parts[0].trim() : "Custom";
+  const song = parts.length >= 2 ? parts.slice(1).join(" - ").trim() : val;
+
+  currentMusicItems.push({ artist, song });
+  _drawMusicList();
+  input.value = "";
+  playSound("caption-select");
+});
+
+document.getElementById("custom-song-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("btn-add-song").click();
+});
 
 function renderCaptions(captions) {
   captionList.innerHTML = "";

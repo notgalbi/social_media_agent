@@ -782,6 +782,36 @@ body::before {
   margin-top: 1px;
 }
 
+.music-preview {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 10px;
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.music-preview:hover { background: var(--accent-light); border-color: var(--accent-light); }
+
+.music-preview.playing {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  animation: previewPulse 1.2s ease infinite;
+}
+
+@keyframes previewPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 96, 124, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(212, 96, 124, 0); }
+}
+
 .music-copy {
   background: none;
   border: 1px solid var(--border);
@@ -801,7 +831,56 @@ body::before {
   color: var(--muted);
   text-align: center;
   letter-spacing: 0.3px;
+  line-height: 1.6;
 }
+
+.music-add-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.music-custom-input {
+  flex: 1;
+  background: rgba(255,255,255,0.7);
+  border: 1.5px dashed var(--accent-light);
+  border-radius: 12px;
+  padding: 10px 13px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+}
+
+.music-custom-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  border-style: solid;
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.music-custom-input::placeholder { color: var(--muted); font-size: 12px; }
+
+.btn-add-song {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.btn-add-song:hover { background: var(--accent-dark); transform: scale(1.1); }
 
 /* ── Edit area ── */
 .selected-wrap {
