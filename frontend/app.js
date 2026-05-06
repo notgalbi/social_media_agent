@@ -5,8 +5,46 @@ const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 let selectedFile = null;
 let selectedCaption = "";
 
-// Keep backend warm — ping every 4 minutes to prevent cold starts
+// Keep backend warm
 setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
+
+// Set login URL
+document.getElementById("btn-instagram-login").href = `${API_URL}/auth/instagram`;
+
+// On load — check auth status and gate the app
+async function initApp() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const authResult = urlParams.get("auth");
+  const username = urlParams.get("username");
+
+  if (authResult) history.replaceState({}, "", window.location.pathname);
+
+  if (authResult === "error") {
+    alert("Instagram connection failed. Please try again.");
+    showScreen("screen-welcome");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/auth/status`);
+    const data = await res.json();
+    if (data.connected) {
+      enterApp(data.username);
+    } else {
+      showScreen("screen-welcome");
+    }
+  } catch {
+    showScreen("screen-welcome");
+  }
+}
+
+function enterApp(username) {
+  document.getElementById("main-header").classList.remove("hidden");
+  document.getElementById("connected-name").textContent = username ? `@${username}` : "Instagram connected";
+  showScreen("screen-upload");
+}
+
+initApp();
 
 // Fetch with timeout + retry
 async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 60000) {
@@ -323,33 +361,19 @@ function showDisconnected() {
 
 btnSettings.addEventListener("click", async () => {
   showScreen("screen-settings");
-
-  // load captions into textarea
   try {
     const res = await fetch(`${API_URL}/settings/captions`);
     const data = await res.json();
     if (data.captions?.length) manualCaptions.value = data.captions.join("\n");
   } catch {}
-
-  // check Instagram connection status
-  try {
-    const res = await fetch(`${API_URL}/auth/status`);
-    const data = await res.json();
-    if (data.connected) {
-      showConnected(data.username);
-    } else {
-      showDisconnected();
-    }
-  } catch {
-    showDisconnected();
-  }
 });
 
 btnSettingsBack.addEventListener("click", () => showScreen("screen-upload"));
 
 document.getElementById("btn-disconnect").addEventListener("click", async () => {
   await fetch(`${API_URL}/auth/logout`, { method: "POST" });
-  showDisconnected();
+  document.getElementById("main-header").classList.add("hidden");
+  showScreen("screen-welcome");
 });
 
 // Save manually pasted captions
