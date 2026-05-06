@@ -5,6 +5,26 @@ const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 let selectedFile = null;
 let selectedCaption = "";
 
+// Keep backend warm — ping every 4 minutes to prevent cold starts
+setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
+
+// Fetch with timeout + retry
+async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 60000) {
+  for (let i = 0; i <= retries; i++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      if (i === retries) throw err;
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+}
+
 // Elements
 const uploadArea = document.getElementById("upload-area");
 const fileInput = document.getElementById("file-input");
@@ -90,8 +110,16 @@ btnGenerate.addEventListener("click", async () => {
   const formData = new FormData();
   formData.append("file", selectedFile);
 
+  const loaderText = document.getElementById("loader-text");
+  const messages = ["Reading your dish...", "Analyzing the photo...", "Writing captions..."];
+  let msgIdx = 0;
+  const msgInterval = setInterval(() => {
+    msgIdx = (msgIdx + 1) % messages.length;
+    loaderText.textContent = messages[msgIdx];
+  }, 3000);
+
   try {
-    const res = await fetch(`${API_URL}/generate-captions`, {
+    const res = await fetchWithRetry(`${API_URL}/generate-captions`, {
       method: "POST",
       body: formData,
     });
@@ -99,10 +127,15 @@ btnGenerate.addEventListener("click", async () => {
     if (!res.ok) throw new Error("Failed to generate captions");
 
     const data = await res.json();
+    clearInterval(msgInterval);
     renderCaptions(data.captions);
     showScreen("screen-captions");
   } catch (err) {
-    alert("Something went wrong. Make sure the backend is running.");
+    clearInterval(msgInterval);
+    const msg = err.name === "AbortError"
+      ? "Taking too long — try a smaller photo or video."
+      : "Could not reach the server. Check your connection and try again.";
+    alert(msg);
     showScreen("screen-upload");
   }
 });
