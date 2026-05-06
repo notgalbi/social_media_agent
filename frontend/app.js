@@ -1,5 +1,135 @@
 const API_URL = "https://socialmediaagent-production-83c2.up.railway.app";
 
+// ── Sound system (Web Audio API — no files needed) ──
+let audioCtx = null;
+
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playSound(type) {
+  try {
+    const ctx = getAudio();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.18, ctx.currentTime);
+    master.connect(ctx.destination);
+
+    switch (type) {
+
+      case "click": {
+        // soft tick
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(master);
+        o.type = "sine";
+        o.frequency.setValueAtTime(600, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.08);
+        g.gain.setValueAtTime(0.5, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        o.start(); o.stop(ctx.currentTime + 0.08);
+        break;
+      }
+
+      case "upload": {
+        // rising chime
+        [0, 0.08, 0.16].forEach((delay, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(master);
+          o.type = "sine";
+          o.frequency.setValueAtTime([440, 554, 659][i], ctx.currentTime + delay);
+          g.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+          o.start(ctx.currentTime + delay);
+          o.stop(ctx.currentTime + delay + 0.3);
+        });
+        break;
+      }
+
+      case "generate": {
+        // magical shimmer sweep
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(master);
+        o.type = "sine";
+        o.frequency.setValueAtTime(300, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.4);
+        g.gain.setValueAtTime(0.3, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        o.start(); o.stop(ctx.currentTime + 0.4);
+        break;
+      }
+
+      case "caption-select": {
+        // soft pop
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(master);
+        o.type = "sine";
+        o.frequency.setValueAtTime(520, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(340, ctx.currentTime + 0.12);
+        g.gain.setValueAtTime(0.4, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        o.start(); o.stop(ctx.currentTime + 0.12);
+        break;
+      }
+
+      case "success": {
+        // victory chime — 4 ascending notes
+        [0, 0.1, 0.2, 0.32].forEach((delay, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(master);
+          o.type = "sine";
+          o.frequency.setValueAtTime([523, 659, 784, 1047][i], ctx.currentTime + delay);
+          g.gain.setValueAtTime(0.45, ctx.currentTime + delay);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.35);
+          o.start(ctx.currentTime + delay);
+          o.stop(ctx.currentTime + delay + 0.35);
+        });
+        break;
+      }
+
+      case "swipe": {
+        // screen transition whoosh
+        const bufSize = ctx.sampleRate * 0.15;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+        const src = ctx.createBufferSource();
+        const filter = ctx.createBiquadFilter();
+        const g = ctx.createGain();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(800, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.15);
+        src.buffer = buf;
+        src.connect(filter); filter.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0.6, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        src.start(); src.stop(ctx.currentTime + 0.15);
+        break;
+      }
+
+      case "music-copy": {
+        // quick double-tick
+        [0, 0.07].forEach(delay => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(master);
+          o.type = "sine";
+          o.frequency.setValueAtTime(880, ctx.currentTime + delay);
+          g.gain.setValueAtTime(0.35, ctx.currentTime + delay);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.08);
+          o.start(ctx.currentTime + delay);
+          o.stop(ctx.currentTime + delay + 0.08);
+        });
+        break;
+      }
+    }
+  } catch {}
+}
+
 // ── Particle background ──
 function spawnParticles() {
   const container = document.getElementById("particles");
@@ -24,6 +154,7 @@ spawnParticles();
 document.addEventListener("click", e => {
   const btn = e.target.closest(".btn-primary, .btn-secondary, .btn-instagram");
   if (!btn) return;
+  playSound("click");
   const r = document.createElement("span");
   r.className = "ripple-effect";
   r.style.left = `${e.clientX - btn.getBoundingClientRect().left}px`;
@@ -53,6 +184,7 @@ function launchConfetti() {
 
 // ── Animated screen transitions ──
 function showScreen(id) {
+  playSound("swipe");
   document.querySelectorAll(".screen").forEach(s => {
     if (!s.classList.contains("hidden")) {
       s.classList.add("hidden");
@@ -203,6 +335,7 @@ function handleFile(file) {
   uploadArea.classList.add("hidden");
   previewWrap.classList.remove("hidden");
   btnGenerate.disabled = false;
+  playSound("upload");
 }
 
 btnClear.addEventListener("click", () => {
@@ -221,6 +354,7 @@ btnClear.addEventListener("click", () => {
 btnGenerate.addEventListener("click", async () => {
   if (!selectedFile) return;
 
+  playSound("generate");
   showScreen("screen-loading");
 
   const formData = new FormData();
@@ -279,6 +413,7 @@ function renderMusic(music) {
       <button class="music-copy" title="Copy song name" data-text="${track.artist} - ${track.song}">⎘</button>
     `;
     el.querySelector(".music-copy").addEventListener("click", async (e) => {
+      playSound("music-copy");
       const text = e.currentTarget.dataset.text;
       try { await navigator.clipboard.writeText(text); } catch {}
       e.currentTarget.textContent = "✓";
@@ -309,6 +444,7 @@ function renderCaptions(captions) {
 }
 
 function selectCaption(card, text) {
+  playSound("caption-select");
   document.querySelectorAll(".caption-card").forEach(c => c.classList.remove("selected"));
   card.classList.add("selected");
   selectedCaption = text;
@@ -359,6 +495,7 @@ btnPost.addEventListener("click", async () => {
         throw new Error(err.detail || "Post failed");
       }
 
+      playSound("success");
       showScreen("screen-success");
       launchConfetti();
     } catch (err) {
