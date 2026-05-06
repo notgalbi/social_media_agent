@@ -17,28 +17,22 @@
 
   <div class="app">
 
-    <!-- Welcome / Login Screen -->
+    <!-- Welcome Screen -->
     <section class="screen" id="screen-welcome">
       <div class="welcome-wrap">
         <div class="welcome-logo">Captionly</div>
         <p class="welcome-tagline">FOR INSTAGRAM CREATORS</p>
         <div class="welcome-orb"></div>
         <p class="welcome-desc">AI captions written in your voice, with music to match. Works for any niche.</p>
-        <a class="btn-instagram" id="btn-instagram-login" href="#">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-          </svg>
-          Connect with Instagram
-        </a>
-        <p class="welcome-note">⚡ Instagram uses Facebook to verify creators — you may see a Facebook login screen. This is normal and required by Meta.</p>
-        <p class="welcome-fine">We never post without your approval.</p>
+        <button class="btn-primary" id="btn-try-now">Try it now →</button>
+        <p class="welcome-fine">No account needed to get started.</p>
       </div>
     </section>
 
-    <!-- Header (shown after login) -->
+    <!-- Header -->
     <header class="header hidden" id="main-header">
       <div class="logo">Captionly</div>
-      <div class="user-pill" id="user-pill"></div>
+      <div class="user-pill hidden" id="user-pill"></div>
       <button class="btn-settings" id="btn-settings">⚙</button>
     </header>
 
@@ -106,18 +100,40 @@
     <section class="screen hidden" id="screen-settings">
       <h2 class="section-title">Settings</h2>
 
-      <div class="settings-block" id="setup-connected">
+      <!-- Power Mode — not connected -->
+      <div class="settings-block power-block" id="setup-connect">
+        <div class="power-badge">⚡ Power Mode</div>
+        <div class="settings-label">Captions in Your Voice</div>
+        <div class="settings-sub">Connect your Instagram and Captionly learns your exact caption style — your words, your tone, your vibe. Results are dramatically better.</div>
+        <div class="power-perks">
+          <div class="perk">✦ Captions match your writing style</div>
+          <div class="perk">✦ Pulls from your real post history</div>
+          <div class="perk">✦ Gets smarter over time</div>
+        </div>
+        <div class="power-req">Requires an Instagram Creator or Business account. Free to switch in Instagram Settings → Account → Switch to Professional.</div>
+        <a class="btn-instagram" id="btn-instagram-login" href="#">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+          </svg>
+          Connect Instagram
+        </a>
+        <p class="power-note">⚡ You may see a Facebook login — this is normal, required by Meta.</p>
+      </div>
+
+      <!-- Power Mode — connected -->
+      <div class="settings-block power-block connected hidden" id="setup-connected">
+        <div class="power-badge">⚡ Power Mode Active</div>
         <div class="connected-badge">✓ Instagram Connected</div>
         <div class="settings-sub" id="connected-name"></div>
         <button class="btn-secondary" id="btn-disconnect">Disconnect</button>
       </div>
 
-      <div class="settings-divider">— caption style —</div>
+      <div class="settings-divider">— manual style —</div>
 
       <div class="settings-block">
-        <div class="settings-label">Style Examples</div>
-        <div class="settings-sub">Paste your existing captions — one per line. Claude matches your exact voice.</div>
-        <textarea id="manual-captions" rows="8" placeholder="Paste your Instagram captions here, one per line..."></textarea>
+        <div class="settings-label">Paste Captions Instead</div>
+        <div class="settings-sub">No Instagram account? Paste your existing captions — one per line — and Claude will match your voice.</div>
+        <textarea id="manual-captions" rows="6" placeholder="Paste your captions here, one per line..."></textarea>
         <button class="btn-primary" id="btn-save-captions">Save Style</button>
         <div class="sync-status hidden" id="manual-status"></div>
       </div>

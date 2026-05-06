@@ -20,6 +20,37 @@ function spawnParticles() {
 }
 spawnParticles();
 
+// ── Ripple effect on buttons ──
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".btn-primary, .btn-secondary, .btn-instagram");
+  if (!btn) return;
+  const r = document.createElement("span");
+  r.className = "ripple-effect";
+  r.style.left = `${e.clientX - btn.getBoundingClientRect().left}px`;
+  r.style.top = `${e.clientY - btn.getBoundingClientRect().top}px`;
+  btn.appendChild(r);
+  setTimeout(() => r.remove(), 700);
+});
+
+// ── Confetti burst on success ──
+function launchConfetti() {
+  const colors = ["#f7c5d2", "#e8b97a", "#c8e6c8", "#d4607c", "#ffffff", "#f0dde5"];
+  for (let i = 0; i < 32; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.cssText = `
+      left: ${20 + Math.random() * 60}%;
+      top: 30%;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      animation-delay: ${Math.random() * 0.4}s;
+      animation-duration: ${0.9 + Math.random() * 0.6}s;
+      transform: rotate(${Math.random() * 360}deg);
+    `;
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 1800);
+  }
+}
+
 // ── Animated screen transitions ──
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => {
@@ -45,38 +76,53 @@ setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
 // Set login URL
 document.getElementById("btn-instagram-login").href = `${API_URL}/auth/instagram`;
 
-// On load — check auth status and gate the app
+// On load — open to everyone, check if already connected
 async function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const authResult = urlParams.get("auth");
   const username = urlParams.get("username");
-
   if (authResult) history.replaceState({}, "", window.location.pathname);
 
-  if (authResult === "error") {
-    alert("Instagram connection failed. Please try again.");
-    showScreen("screen-welcome");
+  if (authResult === "success" && username) {
+    enterApp(username);
     return;
   }
 
+  if (authResult === "error") {
+    alert("Instagram connection failed. Make sure you have a Creator or Business account.");
+  }
+
+  // check if already connected from a previous session
   try {
     const res = await fetch(`${API_URL}/auth/status`);
     const data = await res.json();
     if (data.connected) {
       enterApp(data.username);
-    } else {
-      showScreen("screen-welcome");
+      return;
     }
-  } catch {
-    showScreen("screen-welcome");
-  }
+  } catch {}
+
+  showScreen("screen-welcome");
 }
+
+document.getElementById("btn-try-now").addEventListener("click", () => {
+  enterApp(null);
+});
 
 function enterApp(username) {
   document.getElementById("main-header").classList.remove("hidden");
-  document.getElementById("connected-name").textContent = username ? `@${username}` : "Instagram connected";
   const pill = document.getElementById("user-pill");
-  if (username) pill.textContent = `@${username}`;
+  const connectedName = document.getElementById("connected-name");
+
+  if (username) {
+    pill.textContent = `⚡ @${username}`;
+    pill.classList.remove("hidden");
+    connectedName.textContent = `@${username}`;
+    // show connected state in settings
+    document.getElementById("setup-connect").classList.add("hidden");
+    document.getElementById("setup-connected").classList.remove("hidden");
+  }
+
   showScreen("screen-upload");
 }
 
@@ -314,6 +360,7 @@ btnPost.addEventListener("click", async () => {
       }
 
       showScreen("screen-success");
+      launchConfetti();
     } catch (err) {
       alert(`Could not post: ${err.message}`);
     } finally {
@@ -333,6 +380,7 @@ btnPost.addEventListener("click", async () => {
       document.body.removeChild(ta);
     }
     showScreen("screen-success");
+    launchConfetti();
   }
 });
 
@@ -400,14 +448,30 @@ btnSettings.addEventListener("click", async () => {
     const data = await res.json();
     if (data.captions?.length) manualCaptions.value = data.captions.join("\n");
   } catch {}
+
+  // refresh connection status
+  try {
+    const res = await fetch(`${API_URL}/auth/status`);
+    const data = await res.json();
+    if (data.connected) {
+      document.getElementById("setup-connect").classList.add("hidden");
+      document.getElementById("setup-connected").classList.remove("hidden");
+      document.getElementById("connected-name").textContent = `@${data.username}`;
+    } else {
+      document.getElementById("setup-connect").classList.remove("hidden");
+      document.getElementById("setup-connected").classList.add("hidden");
+    }
+  } catch {}
 });
 
 btnSettingsBack.addEventListener("click", () => showScreen("screen-upload"));
 
 document.getElementById("btn-disconnect").addEventListener("click", async () => {
   await fetch(`${API_URL}/auth/logout`, { method: "POST" });
-  document.getElementById("main-header").classList.add("hidden");
-  showScreen("screen-welcome");
+  document.getElementById("user-pill").classList.add("hidden");
+  document.getElementById("setup-connect").classList.remove("hidden");
+  document.getElementById("setup-connected").classList.add("hidden");
+  showScreen("screen-upload");
 });
 
 // Save manually pasted captions

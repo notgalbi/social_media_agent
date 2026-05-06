@@ -897,3 +897,145 @@ textarea::placeholder { color: var(--muted); }
   color: var(--muted);
   font-weight: 500;
 }
+
+/* ── Power Mode block ── */
+.power-block {
+  border-color: var(--accent-light);
+  background: linear-gradient(135deg, #fff8f9 0%, #fffbf0 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.power-block::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 100px; height: 100px;
+  background: radial-gradient(circle, var(--accent-light) 0%, transparent 70%);
+  pointer-events: none;
+  animation: powerGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes powerGlow {
+  from { opacity: 0.4; transform: scale(1); }
+  to   { opacity: 0.8; transform: scale(1.2); }
+}
+
+.power-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-light);
+  padding: 4px 10px;
+  border-radius: 20px;
+  width: fit-content;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 96, 124, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(212, 96, 124, 0); }
+}
+
+.power-perks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.perk {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: slideRight 0.3s ease both;
+}
+
+.perk:nth-child(1) { animation-delay: 0.05s; }
+.perk:nth-child(2) { animation-delay: 0.1s; }
+.perk:nth-child(3) { animation-delay: 0.15s; }
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.power-req {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  background: var(--gold-light);
+  border: 1px solid #f0dfc0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.power-note {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ── Extra animations ── */
+
+/* Ripple on button tap */
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  width: 40px; height: 40px;
+  margin-top: -20px; margin-left: -20px;
+  animation: ripple 0.6s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Typing cursor on loader text */
+.loader-text::after {
+  content: '|';
+  animation: blink 1s step-end infinite;
+  margin-left: 2px;
+  color: var(--accent);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Upload area pulse when file is selected */
+.preview-wrap.ready {
+  animation: readyPulse 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes readyPulse {
+  0% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+/* Success confetti burst */
+.confetti {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 999;
+  animation: confettiFall 1.2s ease-in forwards;
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(60vh) rotate(720deg); opacity: 0; }
+}
