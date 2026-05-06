@@ -102,11 +102,11 @@ class PostPayload(BaseModel):
 
 # --- Video/image helpers ---
 
-MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB — stay under Claude's 5 MB hard limit
+MAX_B64_BYTES = 4 * 1024 * 1024  # 4 MB base64 — Claude hard limit is 5 MB base64
 
 
-def compress_to_b64(img_bytes: bytes, max_bytes: int = MAX_IMAGE_BYTES) -> str:
-    """Resize + re-encode image until it fits under max_bytes."""
+def compress_to_b64(img_bytes: bytes, max_b64_bytes: int = MAX_B64_BYTES) -> str:
+    """Resize + re-encode until the base64 output is under max_b64_bytes."""
     import io
     from PIL import Image
 
@@ -120,11 +120,10 @@ def compress_to_b64(img_bytes: bytes, max_bytes: int = MAX_IMAGE_BYTES) -> str:
         h = int(img.height * scale)
         resized = img.resize((w, h), Image.LANCZOS) if scale < 1.0 else img
         resized.save(buf, format="JPEG", quality=quality)
-        data = buf.getvalue()
-        if len(data) <= max_bytes:
-            return base64.b64encode(data).decode("utf-8")
-        # Try reducing quality first, then scale down
-        if quality > 60:
+        b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+        if len(b64) <= max_b64_bytes:
+            return b64
+        if quality > 55:
             quality -= 10
         else:
             scale *= 0.75
