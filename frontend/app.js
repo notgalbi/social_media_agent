@@ -327,6 +327,7 @@ function addFiles(fileList) {
 function renderCarousel() {
   const strip = document.getElementById("carousel-strip");
   const countEl = document.getElementById("carousel-count");
+  if (!strip || !countEl) return;
   strip.innerHTML = "";
 
   selectedFiles.forEach((file, idx) => {
