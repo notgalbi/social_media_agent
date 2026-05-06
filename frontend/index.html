@@ -39,15 +39,15 @@
     <!-- Upload Screen -->
     <section class="screen hidden" id="screen-upload">
       <div class="upload-area" id="upload-area">
-        <input type="file" id="file-input" accept="image/*,video/*" hidden />
+        <input type="file" id="file-input" accept="image/*,video/*" multiple hidden />
         <div class="upload-icon">+</div>
-        <div class="upload-label">Upload Photo or Video</div>
-        <div class="upload-sub">JPG, PNG, MP4, MOV</div>
+        <div class="upload-label">Upload Photos or Videos</div>
+        <div class="upload-sub">JPG, PNG, MP4, MOV · Select multiple for carousel</div>
       </div>
       <div class="preview-wrap hidden" id="preview-wrap">
-        <img id="preview-img" src="" alt="preview" />
-        <video id="preview-video" src="" muted playsinline></video>
-        <button class="btn-clear" id="btn-clear">✕ Remove</button>
+        <div class="carousel-strip" id="carousel-strip"></div>
+        <p class="carousel-count" id="carousel-count"></p>
+        <button class="btn-clear" id="btn-clear">✕ Clear all</button>
       </div>
       <button class="btn-primary" id="btn-generate" disabled>
         Generate Captions

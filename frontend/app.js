@@ -199,7 +199,7 @@ function showScreen(id) {
 
 const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 
-let selectedFile = null;
+let selectedFiles = [];
 let selectedCaption = "";
 
 // Keep backend warm
@@ -281,8 +281,6 @@ async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 60000)
 const uploadArea = document.getElementById("upload-area");
 const fileInput = document.getElementById("file-input");
 const previewWrap = document.getElementById("preview-wrap");
-const previewImg = document.getElementById("preview-img");
-const previewVideo = document.getElementById("preview-video");
 const btnClear = document.getElementById("btn-clear");
 const btnGenerate = document.getElementById("btn-generate");
 const captionList = document.getElementById("caption-list");
@@ -291,8 +289,6 @@ const selectedWrap = document.getElementById("selected-wrap");
 const btnPost = document.getElementById("btn-post");
 const btnBack = document.getElementById("btn-back");
 const btnNew = document.getElementById("btn-new");
-
-// showScreen is defined above with animation logic
 
 // Upload interactions
 uploadArea.addEventListener("click", () => fileInput.click());
@@ -309,59 +305,111 @@ uploadArea.addEventListener("dragleave", () => {
 uploadArea.addEventListener("drop", e => {
   e.preventDefault();
   uploadArea.classList.remove("drag-over");
-  const file = e.dataTransfer.files[0];
-  if (file) handleFile(file);
+  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
 });
 
 fileInput.addEventListener("change", () => {
-  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  if (fileInput.files.length) {
+    addFiles(fileInput.files);
+    fileInput.value = "";
+  }
 });
 
-function handleFile(file) {
-  selectedFile = file;
-  const url = URL.createObjectURL(file);
-  const isVideo = file.type.startsWith("video/");
+function addFiles(fileList) {
+  const valid = Array.from(fileList).filter(
+    f => f.type.startsWith("image/") || f.type.startsWith("video/")
+  );
+  selectedFiles = [...selectedFiles, ...valid].slice(0, 10);
+  renderCarousel();
+  if (selectedFiles.length) playSound("upload");
+}
 
-  if (isVideo) {
-    previewVideo.src = url;
-    previewVideo.classList.add("active");
-    previewImg.classList.remove("active");
-  } else {
-    previewImg.src = url;
-    previewImg.classList.add("active");
-    previewVideo.classList.remove("active");
+function renderCarousel() {
+  const strip = document.getElementById("carousel-strip");
+  const countEl = document.getElementById("carousel-count");
+  strip.innerHTML = "";
+
+  selectedFiles.forEach((file, idx) => {
+    const thumb = document.createElement("div");
+    thumb.className = "carousel-thumb";
+
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith("video/")) {
+      const vid = document.createElement("video");
+      vid.src = url; vid.muted = true; vid.playsInline = true;
+      thumb.appendChild(vid);
+      const badge = document.createElement("span");
+      badge.className = "carousel-thumb-badge";
+      badge.textContent = "▶ video";
+      thumb.appendChild(badge);
+    } else {
+      const img = document.createElement("img");
+      img.src = url;
+      thumb.appendChild(img);
+    }
+
+    const rmBtn = document.createElement("button");
+    rmBtn.className = "carousel-thumb-remove";
+    rmBtn.textContent = "✕";
+    rmBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      playSound("click");
+      selectedFiles.splice(idx, 1);
+      if (!selectedFiles.length) {
+        previewWrap.classList.add("hidden");
+        uploadArea.classList.remove("hidden");
+        btnGenerate.disabled = true;
+      } else {
+        renderCarousel();
+      }
+    });
+    thumb.appendChild(rmBtn);
+    strip.appendChild(thumb);
+  });
+
+  if (selectedFiles.length < 10) {
+    const addBtn = document.createElement("div");
+    addBtn.className = "carousel-add";
+    addBtn.innerHTML = `<span class="carousel-add-icon">+</span><span class="carousel-add-label">Add</span>`;
+    addBtn.addEventListener("click", () => fileInput.click());
+    strip.appendChild(addBtn);
   }
+
+  const n = selectedFiles.length;
+  countEl.textContent = n === 1 ? "Single post" : `${n} photos — carousel post`;
 
   uploadArea.classList.add("hidden");
   previewWrap.classList.remove("hidden");
   btnGenerate.disabled = false;
-  playSound("upload");
 }
 
-btnClear.addEventListener("click", () => {
-  selectedFile = null;
-  previewImg.src = "";
-  previewVideo.src = "";
-  previewImg.classList.remove("active");
-  previewVideo.classList.remove("active");
+function clearFiles() {
+  selectedFiles = [];
   previewWrap.classList.add("hidden");
   uploadArea.classList.remove("hidden");
   btnGenerate.disabled = true;
   fileInput.value = "";
-});
+}
+
+btnClear.addEventListener("click", clearFiles);
 
 // Generate captions
 btnGenerate.addEventListener("click", async () => {
-  if (!selectedFile) return;
+  if (!selectedFiles.length) return;
 
   playSound("generate");
   showScreen("screen-loading");
 
   const formData = new FormData();
-  formData.append("file", selectedFile);
+  selectedFiles.forEach(f => formData.append("files", f));
 
   const loaderText = document.getElementById("loader-text");
-  const messages = ["Reading your dish...", "Analyzing the photo...", "Writing captions..."];
+  const isCarousel = selectedFiles.length > 1;
+  const messages = [
+    "Reading your content...",
+    isCarousel ? `Analyzing ${selectedFiles.length} photos...` : "Analyzing the photo...",
+    "Writing captions...",
+  ];
   let msgIdx = 0;
   const msgInterval = setInterval(() => {
     msgIdx = (msgIdx + 1) % messages.length;
@@ -528,21 +576,17 @@ btnPost.addEventListener("click", async () => {
 
 // Back button
 btnBack.addEventListener("click", () => {
+  clearFiles();
   showScreen("screen-upload");
-  btnClear.click();
 });
 
 // New post
 btnNew.addEventListener("click", () => {
-  selectedFile = null;
+  clearFiles();
   selectedCaption = "";
   captionEdit.value = "";
   captionList.innerHTML = "";
   selectedWrap.classList.add("hidden");
-  previewWrap.classList.add("hidden");
-  uploadArea.classList.remove("hidden");
-  btnGenerate.disabled = true;
-  fileInput.value = "";
   showScreen("screen-upload");
 });
 

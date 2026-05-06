@@ -156,7 +156,7 @@ def parse_music(raw: str) -> list[dict]:
     return music[:3]
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg") -> dict:
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1) -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
     system = BRAND_CONTEXT + style_block
@@ -168,11 +168,21 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg") 
             "source": {"type": "base64", "media_type": media_type, "data": img_b64}
         })
 
+    if num_source_files > 1:
+        image_context = (
+            f"This is a carousel post with {num_source_files} images. "
+            "Look at all of them together as a cohesive set — the common theme, mood, and story they tell together. "
+            "Write captions that describe or celebrate the full set, not just a single image."
+        )
+    else:
+        image_context = (
+            "Look closely at this image — the subject, mood, colors, setting, and details."
+        )
+
     content.append({
         "type": "text",
         "text": (
-            "Look closely at this image and write 3 Instagram captions based on what you see — "
-            "the subject, mood, colors, setting, and details. "
+            f"{image_context} Write 3 Instagram captions based on what you see. "
             "Match the creator's voice exactly if example captions are provided.\n\n"
             "Caption styles:\n"
             "1. Casual and relatable — feels natural and personal\n"
@@ -211,31 +221,45 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg") 
 # --- Routes ---
 
 @app.post("/generate-captions")
-async def generate_captions_endpoint(file: UploadFile = File(...)):
-    suffix = Path(file.filename).suffix.lower()
-    is_video = suffix in [".mp4", ".mov", ".avi", ".m4v"]
-    is_image = suffix in [".jpg", ".jpeg", ".png", ".webp"]
-
-    if not is_video and not is_image:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+async def generate_captions_endpoint(files: list[UploadFile] = File(...)):
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded")
 
     ext_to_mime = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
         ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif",
     }
 
+    all_frames: list[str] = []
+    tmp_paths: list[str] = []
+    last_media_type = "image/jpeg"
+
+    for file in files:
+        suffix = Path(file.filename).suffix.lower()
+        is_video = suffix in [".mp4", ".mov", ".avi", ".m4v"]
+        is_image = suffix in [".jpg", ".jpeg", ".png", ".webp"]
+        if not is_video and not is_image:
+            continue
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_paths.append(tmp.name)
+
+        if is_video:
+            frames_per_video = max(1, 3 // len(files))
+            all_frames.extend(extract_frames(tmp.name, num_frames=frames_per_video))
+            last_media_type = "image/jpeg"
+        else:
+            all_frames.append(base64.b64encode(open(tmp.name, "rb").read()).decode("utf-8"))
+            last_media_type = ext_to_mime.get(suffix, "image/jpeg")
+
+    if not all_frames:
+        raise HTTPException(status_code=400, detail="No supported files found")
+
+    log.info(f"Processing {len(files)} file(s), {len(all_frames)} image frame(s)")
+
     try:
-        log.info(f"Processing file: {file.filename} ({suffix})")
-        frames = extract_frames(tmp_path) if is_video else [
-            base64.b64encode(open(tmp_path, "rb").read()).decode("utf-8")
-        ]
-        media_type = "image/jpeg" if is_video else ext_to_mime.get(suffix, "image/jpeg")
-        log.info(f"Generating captions + music for {media_type}")
-        result = generate_content(frames, media_type)
+        result = generate_content(all_frames, last_media_type, num_source_files=len(files))
         log.info(f"Generated: {result}")
         return result
     except Exception as e:
@@ -250,7 +274,9 @@ async def generate_captions_endpoint(file: UploadFile = File(...)):
         })
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        os.unlink(tmp_path)
+        for p in tmp_paths:
+            try: os.unlink(p)
+            except: pass
 
 
 # Manually paste example captions
