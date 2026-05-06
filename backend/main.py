@@ -223,18 +223,31 @@ async def generate_captions_endpoint(file: UploadFile = File(...)):
         tmp.write(await file.read())
         tmp_path = tmp.name
 
+    ext_to_mime = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif",
+    }
+
     try:
         log.info(f"Processing file: {file.filename} ({suffix})")
         frames = extract_frames(tmp_path) if is_video else [
             base64.b64encode(open(tmp_path, "rb").read()).decode("utf-8")
         ]
-        media_type = "image/jpeg" if is_video else f"image/{suffix.lstrip('.')}"
+        media_type = "image/jpeg" if is_video else ext_to_mime.get(suffix, "image/jpeg")
         log.info(f"Generating captions + music for {media_type}")
         result = generate_content(frames, media_type)
         log.info(f"Generated: {result}")
         return result
     except Exception as e:
         log.error(f"Caption generation failed: {e}", exc_info=True)
+        LOG_ENTRIES.append({
+            "time": datetime.now(timezone.utc).isoformat(),
+            "method": "POST",
+            "path": "/generate-captions",
+            "status": 500,
+            "duration_s": 0,
+            "error": str(e),
+        })
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         os.unlink(tmp_path)

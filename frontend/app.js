@@ -374,7 +374,10 @@ btnGenerate.addEventListener("click", async () => {
       body: formData,
     });
 
-    if (!res.ok) throw new Error("Failed to generate captions");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Server error ${res.status}`);
+    }
 
     const data = await res.json();
     clearInterval(msgInterval);
@@ -385,7 +388,9 @@ btnGenerate.addEventListener("click", async () => {
     clearInterval(msgInterval);
     const msg = err.name === "AbortError"
       ? "Taking too long — try a smaller photo or video."
-      : "Could not reach the server. Check your connection and try again.";
+      : err.message.startsWith("Server error") || err.message.length < 120
+        ? err.message
+        : "Could not reach the server. Check your connection and try again.";
     alert(msg);
     showScreen("screen-upload");
   }
