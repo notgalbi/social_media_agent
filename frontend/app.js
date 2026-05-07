@@ -312,6 +312,7 @@ const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 let selectedFiles = [];
 let selectedCaption = "";
 let selectedTone = "auto";
+let selectedLength = "short";
 
 // Tone pill selection
 document.querySelectorAll(".tone-pill").forEach(pill => {
@@ -319,6 +320,16 @@ document.querySelectorAll(".tone-pill").forEach(pill => {
     document.querySelectorAll(".tone-pill").forEach(p => p.classList.remove("active"));
     pill.classList.add("active");
     selectedTone = pill.dataset.tone;
+    playSound("click");
+  });
+});
+
+// Length pill selection
+document.querySelectorAll(".length-pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    document.querySelectorAll(".length-pill").forEach(p => p.classList.remove("active"));
+    pill.classList.add("active");
+    selectedLength = pill.dataset.length;
     playSound("click");
   });
 });
@@ -531,8 +542,7 @@ function clearFiles() {
 
 btnClear.addEventListener("click", clearFiles);
 
-// Generate captions
-btnGenerate.addEventListener("click", async () => {
+async function generateCaptions() {
   if (!selectedFiles.length) return;
 
   playSound("generate");
@@ -541,10 +551,17 @@ btnGenerate.addEventListener("click", async () => {
   const formData = new FormData();
   selectedFiles.forEach(f => formData.append("files", f));
   formData.append("tone", selectedTone);
+  formData.append("length", selectedLength);
 
   const loaderText = document.getElementById("loader-text");
   const isCarousel = selectedFiles.length > 1;
-  const toneLabel = { auto: "the vibe", aesthetic: "aesthetic", bold: "bold energy", relatable: "the feels", romantic: "the romance", motivational: "the motivation" }[selectedTone] || "the vibe";
+  const toneLabelMap = {
+    auto: "the vibe", aesthetic: "the aesthetic", bold: "bold energy",
+    relatable: "the feels", romantic: "the romance", motivational: "the motivation",
+    wanderlust: "wanderlust", funny: "the humor", earthy: "the earthy vibe",
+    hustle: "hustle mode", moody: "the mood", foodie: "the dish",
+  };
+  const toneLabel = toneLabelMap[selectedTone] || "the vibe";
   const messages = [
     "Reading your content...",
     isCarousel ? `Analyzing ${selectedFiles.length} photos...` : "Catching the aesthetic...",
@@ -582,7 +599,10 @@ btnGenerate.addEventListener("click", async () => {
     alert(msg);
     showScreen("screen-upload");
   }
-});
+}
+
+btnGenerate.addEventListener("click", generateCaptions);
+document.getElementById("btn-refresh").addEventListener("click", generateCaptions);
 
 
 let currentMusicItems = [];
