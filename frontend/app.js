@@ -695,9 +695,10 @@ async function addMusicToPreview(cardEl, artist, song) {
   const mtp = document.getElementById("mtp");
   document.getElementById("mtp-info").textContent = `${artist} — ${song}`;
   document.getElementById("mtp-start").value = 0;
-  document.getElementById("mtp-length").value = 15;
+  document.getElementById("mtp-length").value = 30;
   document.getElementById("mtp-start-val").textContent = "0:00";
-  document.getElementById("mtp-length-val").textContent = "0:15";
+  document.getElementById("mtp-length-val").textContent = "0:30";
+  document.getElementById("mtp-start").max = 27; // 30 - min clip 3s
   mtp.classList.remove("hidden");
   updateMtpPlayBtn("loading");
 
@@ -737,9 +738,10 @@ let mtpStopTimer = null;
 
 // Trim panel — play/pause
 document.getElementById("mtp-play").addEventListener("click", () => {
-  if (!previewMusicAudio || !previewMusicUrl) return;
+  if (!previewMusicUrl) return;
 
-  if (!previewMusicAudio.paused) {
+  // Pause if already playing
+  if (previewMusicAudio && !previewMusicAudio.paused) {
     previewMusicAudio.pause();
     clearTimeout(mtpStopTimer);
     updateMtpPlayBtn("stopped");
@@ -749,7 +751,13 @@ document.getElementById("mtp-play").addEventListener("click", () => {
   const startSec = parseFloat(document.getElementById("mtp-start").value);
   const lengthSec = parseFloat(document.getElementById("mtp-length").value);
 
+  // Always create Audio synchronously here (iOS Safari: user-gesture context must be
+  // synchronous — Audio created in an async function loses playback permission)
+  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  previewMusicAudio = new Audio(previewMusicUrl);
   previewMusicAudio.currentTime = startSec;
+  previewMusicAudio.addEventListener("ended", () => updateMtpPlayBtn("stopped"), { once: true });
+
   previewMusicAudio.play().then(() => {
     updateMtpPlayBtn("playing");
     clearTimeout(mtpStopTimer);
@@ -762,15 +770,32 @@ document.getElementById("mtp-play").addEventListener("click", () => {
   }).catch(() => updateMtpPlayBtn("stopped"));
 });
 
-// Start slider
+// Start slider — cap length so start + length ≤ 30
 document.getElementById("mtp-start").addEventListener("input", e => {
-  document.getElementById("mtp-start-val").textContent = fmtTime(e.target.value);
-  if (previewMusicAudio) previewMusicAudio.currentTime = parseFloat(e.target.value);
+  const startSec = parseFloat(e.target.value);
+  document.getElementById("mtp-start-val").textContent = fmtTime(startSec);
+  const lengthEl = document.getElementById("mtp-length");
+  const maxLen = Math.max(3, 30 - startSec);
+  lengthEl.max = maxLen;
+  if (parseFloat(lengthEl.value) > maxLen) {
+    lengthEl.value = maxLen;
+    document.getElementById("mtp-length-val").textContent = fmtTime(maxLen);
+  }
+  if (previewMusicAudio) previewMusicAudio.currentTime = startSec;
 });
 
-// Length slider
+// Length slider — cap start so start + length ≤ 30
 document.getElementById("mtp-length").addEventListener("input", e => {
-  document.getElementById("mtp-length-val").textContent = fmtTime(e.target.value);
+  const lengthSec = parseFloat(e.target.value);
+  document.getElementById("mtp-length-val").textContent = fmtTime(lengthSec);
+  const startEl = document.getElementById("mtp-start");
+  const maxStart = Math.max(0, 30 - lengthSec);
+  startEl.max = maxStart;
+  if (parseFloat(startEl.value) > maxStart) {
+    startEl.value = maxStart;
+    document.getElementById("mtp-start-val").textContent = fmtTime(maxStart);
+    if (previewMusicAudio) previewMusicAudio.currentTime = maxStart;
+  }
 });
 
 // Remove music from preview

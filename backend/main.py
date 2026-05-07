@@ -79,9 +79,9 @@ CAPTION RULES:
 - Use real Instagram language naturally where it fits: "it's giving", "understood the assignment", "ate and left no crumbs", "main character", "no cap", "rent free", "I'm not okay", "POV:", "the way...", "in my ___ era", "that girl", "this is everything", "we're not the same", "core". Never force slang — only use what feels organic.
 - Format like real Instagram posts: short punchy lines with line breaks, not walls of text.
 - Place emojis at the end of lines or sentences — never randomly mid-sentence.
-- End EVERY caption with 5–7 relevant hashtags on a new line (mix 2 high-volume + 3 mid-niche + 2 micro-niche).
+- End EVERY caption with 3–5 tight hashtags on a new line — no more.
 - Start with a scroll-stopping hook: a question, a bold statement, a relatable feeling, or "POV:".
-- Each caption should be 3–8 lines + hashtags.
+- Keep captions SHORT: 1–3 lines max before hashtags. Punchy beats long every time.
 - If example captions from the creator are provided, match their exact vocabulary, emoji style, and punctuation perfectly.
 - NEVER sound like a brand, ad, or press release. Sound like a real person.
 - You must ALWAYS respond with exactly 3 captions and 3 music suggestions in the required format.
@@ -241,10 +241,11 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             f"{image_context} Write 3 Instagram captions based on what you see. "
             "Match the creator's voice exactly if example captions are provided.\n\n"
             "Caption styles:\n"
-            "1. Vibe caption — sets the mood, aesthetic, sensory. 3–5 short lines + hashtags.\n"
-            "2. Hook caption — opens with POV:, a question, or a bold relatable statement. Invites comments. 4–7 lines + hashtags.\n"
-            "3. Story caption — shares a real feeling, moment, or mini story. Personal and genuine. 5–8 lines + hashtags.\n\n"
-            "IMPORTANT: Each caption MUST end with 5–7 hashtags on a new line. "
+            "1. Vibe caption — sets the mood. 1–2 punchy lines + hashtags.\n"
+            "2. Hook caption — opens with POV:, a question, or bold statement. 1–3 lines + hashtags.\n"
+            "3. Story caption — a real feeling or moment. 2–3 lines + hashtags.\n\n"
+            "IMPORTANT: Keep every caption SHORT — 1 to 3 lines max before the hashtags. "
+            "Each caption MUST end with 3–5 hashtags on a new line. "
             "Use real, current Instagram hashtags that match the content niche.\n\n"
             "Then suggest 3 real trending songs currently on Instagram's music library that match the vibe.\n\n"
             "Format your response EXACTLY as:\n"
