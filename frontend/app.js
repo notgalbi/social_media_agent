@@ -162,100 +162,95 @@ function playSound(type) {
   } catch {}
 }
 
-// ── 3D Canvas starfield ──
+// ── Sakura petal canvas ──
 (function () {
   const canvas = document.getElementById("bg-canvas");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
-  const COLORS = ["#ffffff", "#f7c5d2", "#fde8ed", "#e8b97a", "#f0dde5", "#d4c8f0"];
-  let W = 0, H = 0, stars = [];
+  const COLORS = [
+    "rgba(240,200,212,0.75)",
+    "rgba(232,180,192,0.65)",
+    "rgba(248,220,228,0.85)",
+    "rgba(220,155,175,0.60)",
+    "rgba(252,238,242,0.80)"
+  ];
+  let W = 0, H = 0, petals = [];
 
   function resize() {
     W = canvas.width  = window.innerWidth;
     H = canvas.height = window.innerHeight;
   }
 
-  function makeStar(fromTop) {
-    const z = Math.random();              // 0 = far, 1 = close
+  function makePetal(fromTop) {
+    const z = Math.random(); // 0 = far/small/slow, 1 = close/large/fast
     return {
-      x:       Math.random() * W,
-      y:       fromTop ? -(Math.random() * 20) : Math.random() * H,
+      x:         Math.random() * W,
+      y:         fromTop ? -(Math.random() * 40 + 10) : Math.random() * H,
       z,
-      r:       0.3 + z * 2.6,            // close stars bigger
-      speed:   0.12 + z * 1.0,           // close stars faster
-      drift:   (Math.random() - 0.5) * 0.18,
-      color:   COLORS[Math.floor(Math.random() * COLORS.length)],
-      alpha:   0.12 + z * 0.72,
-      phase:   Math.random() * Math.PI * 2,
-      freq:    0.012 + Math.random() * 0.028,
-      sparkle: z > 0.72 && Math.random() > 0.45, // close ones get cross shape
+      size:      4 + z * 13,
+      speed:     0.15 + z * 1.2,
+      drift:     (Math.random() - 0.5) * 0.5,
+      rot:       Math.random() * Math.PI * 2,
+      rotSpeed:  (Math.random() - 0.5) * 0.03,
+      swayPhase: Math.random() * Math.PI * 2,
+      swayFreq:  0.008 + Math.random() * 0.014,
+      color:     COLORS[Math.floor(Math.random() * COLORS.length)],
+      alpha:     0.25 + z * 0.50,
     };
   }
 
+  function drawPetal(p) {
+    const size = p.size;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.globalAlpha = p.alpha;
+
+    // Draw 5 petals as ellipses rotated around the center
+    ctx.fillStyle = p.color;
+    for (let i = 0; i < 5; i++) {
+      ctx.save();
+      ctx.rotate(i * Math.PI * 2 / 5);
+      ctx.beginPath();
+      ctx.ellipse(0, -size * 0.5, size * 0.28, size * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Small center dot
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,230,235,0.9)";
+    ctx.fill();
+
+    ctx.restore();
+  }
+
   function init() {
-    stars = Array.from({ length: 180 }, () => makeStar(false));
+    petals = Array.from({ length: 40 }, () => makePetal(false));
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
-    for (let i = 0; i < stars.length; i++) {
-      const s = stars[i];
+    for (let i = 0; i < petals.length; i++) {
+      const p = petals[i];
 
-      // Move
-      s.y += s.speed;
-      s.x += s.drift;
-      s.phase += s.freq;
+      // Move down + sinusoidal sway
+      p.y += p.speed;
+      p.swayPhase += p.swayFreq;
+      p.x += p.drift + Math.sin(p.swayPhase) * 0.55;
+      p.rot += p.rotSpeed;
 
-      // Recycle off-screen stars
-      if (s.y > H + 12) { stars[i] = makeStar(true); continue; }
-      if (s.x < -12) s.x = W + 12;
-      if (s.x > W + 12) s.x = -12;
+      // Recycle when off-screen
+      if (p.y > H + 20) { petals[i] = makePetal(true); continue; }
+      if (p.x < -20) p.x = W + 20;
+      if (p.x > W + 20) p.x = -20;
 
-      const twinkle = 0.6 + 0.4 * Math.sin(s.phase);
-      const a = s.alpha * twinkle;
-
-      // Sparkle cross shape for close-layer stars
-      if (s.sparkle) {
-        const arm = s.r * 2.2;
-        ctx.save();
-        ctx.globalAlpha = a * 0.55;
-        ctx.strokeStyle = s.color;
-        ctx.lineWidth = s.r * 0.45;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(s.x - arm, s.y);     ctx.lineTo(s.x + arm, s.y);
-        ctx.moveTo(s.x, s.y - arm);     ctx.lineTo(s.x, s.y + arm);
-        ctx.moveTo(s.x - arm * 0.6, s.y - arm * 0.6);
-        ctx.lineTo(s.x + arm * 0.6, s.y + arm * 0.6);
-        ctx.moveTo(s.x + arm * 0.6, s.y - arm * 0.6);
-        ctx.lineTo(s.x - arm * 0.6, s.y + arm * 0.6);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Core dot
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = s.color;
-      ctx.globalAlpha = a;
-      ctx.fill();
-
-      // Soft glow halo on close stars
-      if (s.z > 0.55) {
-        const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 5);
-        glow.addColorStop(0, s.color);
-        glow.addColorStop(1, "transparent");
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r * 5, 0, Math.PI * 2);
-        ctx.fillStyle = glow;
-        ctx.globalAlpha = a * 0.28;
-        ctx.fill();
-      }
-
-      ctx.globalAlpha = 1;
+      drawPetal(p);
     }
 
+    ctx.globalAlpha = 1;
     requestAnimationFrame(draw);
   }
 
