@@ -583,11 +583,10 @@ let previewMusicUrl = null;
 let selectedMusicCardEl = null;
 const musicUrlCache = {}; // keyed by "Artist - Song"
 
-async function itunesPreviewUrl(term) {
+async function itunesSearch(term) {
   const q = encodeURIComponent(term);
   const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=5`);
-  const data = await res.json();
-  return data.results?.find(r => r.previewUrl)?.previewUrl || null;
+  return res.json();
 }
 
 async function prefetchMusicUrls(tracks) {
@@ -596,11 +595,20 @@ async function prefetchMusicUrls(tracks) {
     if (musicUrlCache[key] !== undefined) continue;
     musicUrlCache[key] = "loading";
     try {
-      // Try "Artist Song" first, then fall back to song title alone
-      const url = (await itunesPreviewUrl(`${t.artist} ${t.song}`)) || (await itunesPreviewUrl(t.song));
-      musicUrlCache[key] = url;
-    } catch {
+      const d1 = await itunesSearch(`${t.artist} ${t.song}`);
+      let hit = d1.results?.find(r => r.previewUrl);
+      if (!hit) {
+        const d2 = await itunesSearch(t.song);
+        hit = d2.results?.find(r => r.previewUrl);
+        if (!hit) {
+          const first = d1.results?.[0];
+          _debugToast(`No preview: "${t.song}" — iTunes returned ${d1.resultCount} result(s), first: "${first?.trackName || "none"}"`);
+        }
+      }
+      musicUrlCache[key] = hit?.previewUrl || null;
+    } catch(e) {
       musicUrlCache[key] = null;
+      _debugToast(`iTunes fetch error: ${e?.message}`);
     }
   }
 }
