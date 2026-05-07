@@ -664,24 +664,21 @@ function fmtTime(sec) {
 async function addMusicToPreview(cardEl, artist, song) {
   playSound("caption-select");
 
+  // Stop anything currently playing
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); currentPreviewBtn = null; } }
+  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+
   // Highlight selected card
   if (selectedMusicCardEl) selectedMusicCardEl.classList.remove("preview-selected");
   selectedMusicCardEl = cardEl;
   cardEl.classList.add("preview-selected");
 
-  // Stop any current trim audio
-  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
-  updateMtpPlayBtn(false);
-
-  // Show music bar on preview card with track name
-  const bar = document.getElementById("ig-music-bar");
+  // Show music bar overlay
   const scrollText = document.getElementById("ig-music-scroll-text");
-  if (bar) {
-    scrollText.textContent = `${artist} — ${song}`;
-    bar.classList.remove("hidden");
-  }
+  if (scrollText) scrollText.textContent = `${artist} — ${song}`;
+  document.getElementById("ig-music-bar")?.classList.remove("hidden");
 
-  // Show trim panel
+  // Show trim panel in loading state
   const mtp = document.getElementById("mtp");
   document.getElementById("mtp-info").textContent = `${artist} — ${song}`;
   document.getElementById("mtp-start").value = 0;
@@ -689,8 +686,9 @@ async function addMusicToPreview(cardEl, artist, song) {
   document.getElementById("mtp-start-val").textContent = "0:00";
   document.getElementById("mtp-length-val").textContent = "0:15";
   mtp.classList.remove("hidden");
+  updateMtpPlayBtn("loading");
 
-  // Fetch iTunes preview URL in background
+  // Fetch preview URL and pre-load audio
   previewMusicTrack = { artist, song };
   previewMusicUrl = null;
   try {
@@ -699,42 +697,56 @@ async function addMusicToPreview(cardEl, artist, song) {
     const data = await res.json();
     previewMusicUrl = data.results?.[0]?.previewUrl || null;
   } catch {}
+
+  if (previewMusicUrl) {
+    // Pre-load the audio so it's ready when user taps play
+    previewMusicAudio = new Audio(previewMusicUrl);
+    previewMusicAudio.preload = "auto";
+    previewMusicAudio.load();
+    previewMusicAudio.addEventListener("ended", () => updateMtpPlayBtn("stopped"), { once: true });
+    updateMtpPlayBtn("stopped");
+  } else {
+    updateMtpPlayBtn("unavailable");
+  }
 }
 
-function updateMtpPlayBtn(playing) {
+function updateMtpPlayBtn(state) {
   const btn = document.getElementById("mtp-play");
   if (!btn) return;
-  btn.textContent = playing ? "⏸" : "▶";
-  playing ? btn.classList.add("playing") : btn.classList.remove("playing");
+  btn.classList.remove("playing");
+  if (state === "playing")      { btn.textContent = "⏸"; btn.classList.add("playing"); }
+  else if (state === "loading") { btn.textContent = "…"; btn.disabled = true; }
+  else if (state === "unavailable") { btn.textContent = "—"; btn.disabled = true; }
+  else                          { btn.textContent = "▶"; btn.disabled = false; }
 }
+
+let mtpStopTimer = null;
 
 // Trim panel — play/pause
 document.getElementById("mtp-play").addEventListener("click", () => {
-  if (!previewMusicUrl) return;
+  if (!previewMusicAudio || !previewMusicUrl) return;
 
-  if (previewMusicAudio && !previewMusicAudio.paused) {
+  if (!previewMusicAudio.paused) {
     previewMusicAudio.pause();
-    updateMtpPlayBtn(false);
+    clearTimeout(mtpStopTimer);
+    updateMtpPlayBtn("stopped");
     return;
   }
 
   const startSec = parseFloat(document.getElementById("mtp-start").value);
   const lengthSec = parseFloat(document.getElementById("mtp-length").value);
 
-  if (!previewMusicAudio) previewMusicAudio = new Audio(previewMusicUrl);
   previewMusicAudio.currentTime = startSec;
   previewMusicAudio.play().then(() => {
-    updateMtpPlayBtn(true);
-    // Auto-stop after selected length
-    setTimeout(() => {
+    updateMtpPlayBtn("playing");
+    clearTimeout(mtpStopTimer);
+    mtpStopTimer = setTimeout(() => {
       if (previewMusicAudio && !previewMusicAudio.paused) {
         previewMusicAudio.pause();
-        updateMtpPlayBtn(false);
+        updateMtpPlayBtn("stopped");
       }
     }, lengthSec * 1000);
-  }).catch(() => updateMtpPlayBtn(false));
-
-  previewMusicAudio.addEventListener("ended", () => updateMtpPlayBtn(false), { once: true });
+  }).catch(() => updateMtpPlayBtn("stopped"));
 });
 
 // Start slider
@@ -751,12 +763,14 @@ document.getElementById("mtp-length").addEventListener("input", e => {
 // Remove music from preview
 document.getElementById("mtp-remove").addEventListener("click", () => {
   if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  clearTimeout(mtpStopTimer);
   previewMusicUrl = null;
   previewMusicTrack = null;
   if (selectedMusicCardEl) { selectedMusicCardEl.classList.remove("preview-selected"); selectedMusicCardEl = null; }
   document.getElementById("ig-music-bar")?.classList.add("hidden");
   document.getElementById("mtp").classList.add("hidden");
-  updateMtpPlayBtn(false);
+  const btn = document.getElementById("mtp-play");
+  if (btn) { btn.textContent = "▶"; btn.disabled = false; btn.classList.remove("playing"); }
 });
 
 // Custom song input
