@@ -81,13 +81,22 @@
         </div>
       </div>
 
-      <div class="tone-selector">
-        <div class="tone-label">Caption Length</div>
-        <div class="tone-pills">
-          <button class="length-pill active" data-length="short">Short</button>
-          <button class="length-pill" data-length="medium">Medium</button>
-          <button class="length-pill" data-length="long">Long</button>
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span class="tone-label">Caption Length</span>
+          <span class="slider-val" id="length-val-label">Short</span>
         </div>
+        <input type="range" class="caption-slider" id="length-slider" min="1" max="5" step="1" value="2" />
+        <div class="slider-ticks"><span>Micro</span><span>Story</span></div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span class="tone-label">Hashtags</span>
+          <span class="slider-val" id="hashtag-val-label">5 tags</span>
+        </div>
+        <input type="range" class="caption-slider" id="hashtag-slider" min="0" max="10" step="1" value="5" />
+        <div class="slider-ticks"><span>None</span><span>10</span></div>
       </div>
 
       <button class="btn-primary" id="btn-generate" disabled>

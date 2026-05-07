@@ -312,7 +312,8 @@ const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 let selectedFiles = [];
 let selectedCaption = "";
 let selectedTone = "auto";
-let selectedLength = "short";
+let selectedLengthLevel = 2;
+let selectedHashtagCount = 5;
 
 // Tone pill selection
 document.querySelectorAll(".tone-pill").forEach(pill => {
@@ -324,15 +325,32 @@ document.querySelectorAll(".tone-pill").forEach(pill => {
   });
 });
 
-// Length pill selection
-document.querySelectorAll(".length-pill").forEach(pill => {
-  pill.addEventListener("click", () => {
-    document.querySelectorAll(".length-pill").forEach(p => p.classList.remove("active"));
-    pill.classList.add("active");
-    selectedLength = pill.dataset.length;
-    playSound("click");
-  });
-});
+// Length slider
+const LENGTH_LABELS = { 1: "Micro", 2: "Short", 3: "Medium", 4: "Long", 5: "Story" };
+const lengthSlider = document.getElementById("length-slider");
+const lengthValLabel = document.getElementById("length-val-label");
+
+function updateLengthSlider() {
+  selectedLengthLevel = parseInt(lengthSlider.value);
+  lengthValLabel.textContent = LENGTH_LABELS[selectedLengthLevel];
+  const pct = ((selectedLengthLevel - 1) / 4) * 100;
+  lengthSlider.style.setProperty("--fill", pct + "%");
+}
+lengthSlider.addEventListener("input", updateLengthSlider);
+updateLengthSlider();
+
+// Hashtag slider
+const hashtagSlider = document.getElementById("hashtag-slider");
+const hashtagValLabel = document.getElementById("hashtag-val-label");
+
+function updateHashtagSlider() {
+  selectedHashtagCount = parseInt(hashtagSlider.value);
+  hashtagValLabel.textContent = selectedHashtagCount === 0 ? "None" : `${selectedHashtagCount} tags`;
+  const pct = (selectedHashtagCount / 10) * 100;
+  hashtagSlider.style.setProperty("--fill", pct + "%");
+}
+hashtagSlider.addEventListener("input", updateHashtagSlider);
+updateHashtagSlider();
 
 // Keep backend warm
 setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
@@ -551,7 +569,8 @@ async function generateCaptions() {
   const formData = new FormData();
   selectedFiles.forEach(f => formData.append("files", f));
   formData.append("tone", selectedTone);
-  formData.append("length", selectedLength);
+  formData.append("length_level", selectedLengthLevel);
+  formData.append("hashtag_count", selectedHashtagCount);
 
   const loaderText = document.getElementById("loader-text");
   const isCarousel = selectedFiles.length > 1;
