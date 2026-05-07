@@ -549,10 +549,26 @@ let previewMusicAudio = null;
 let previewMusicTrack = null;
 let previewMusicUrl = null;
 let selectedMusicCardEl = null;
+const musicUrlCache = {}; // keyed by "Artist - Song"
+
+async function prefetchMusicUrls(tracks) {
+  for (const t of tracks) {
+    const key = `${t.artist} - ${t.song}`;
+    if (musicUrlCache[key] !== undefined) continue;
+    musicUrlCache[key] = null; // mark in-progress to avoid duplicate fetches
+    try {
+      const q = encodeURIComponent(`${t.artist} ${t.song}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
+      const data = await res.json();
+      musicUrlCache[key] = data.results?.[0]?.previewUrl || null;
+    } catch {}
+  }
+}
 
 function renderMusic(music) {
   currentMusicItems = music ? [...music] : [];
   _drawMusicList();
+  prefetchMusicUrls(currentMusicItems); // background — no await
 }
 
 function _drawMusicList() {
@@ -603,7 +619,8 @@ function _drawMusicList() {
   wrap.classList.remove("hidden");
 }
 
-async function handlePreview(btn, artist, song) {
+function handlePreview(btn, artist, song) {
+  // Toggle play/pause on same button
   if (currentPreviewBtn === btn && currentAudio) {
     if (currentAudio.paused) {
       currentAudio.play();
@@ -617,6 +634,7 @@ async function handlePreview(btn, artist, song) {
     return;
   }
 
+  // Stop any other playing track
   if (currentAudio) {
     currentAudio.pause();
     if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); }
@@ -624,48 +642,34 @@ async function handlePreview(btn, artist, song) {
     currentPreviewBtn = null;
   }
 
-  btn.textContent = "…";
+  const key = `${artist} - ${song}`;
+  const url = musicUrlCache[key];
 
-  // Create Audio element synchronously (before any await) so iOS Safari
-  // keeps the user-gesture context alive for the later .play() call
-  const audio = new Audio();
-  audio.preload = "auto";
+  if (!url) {
+    // URL not ready yet — show briefly then restore
+    btn.textContent = "…";
+    setTimeout(() => { if (btn.textContent === "…") btn.textContent = "▶"; }, 1500);
+    return;
+  }
+
+  // URL is cached — create and play synchronously (iOS Safari requires no awaits)
+  const audio = new Audio(url);
   currentAudio = audio;
   currentPreviewBtn = btn;
 
-  try {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(artist + " " + song)}&media=music&limit=1`,
-      { signal: controller.signal }
-    );
-    const data = await res.json();
-    const url = data.results?.[0]?.previewUrl;
-
-    if (!url || currentAudio !== audio) {
-      btn.textContent = "—";
-      setTimeout(() => btn.textContent = "▶", 2000);
-      if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
-      return;
-    }
-
-    audio.src = url;
-    audio.load();
-    await audio.play();
+  audio.play().then(() => {
     btn.textContent = "⏸";
     btn.classList.add("playing");
-
     audio.addEventListener("ended", () => {
       btn.textContent = "▶";
       btn.classList.remove("playing");
       if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
     });
-  } catch {
+  }).catch(() => {
     btn.textContent = "▶";
     btn.classList.remove("playing");
     if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
-  }
+  });
 }
 
 // ── Music → Preview integration ──
@@ -675,7 +679,7 @@ function fmtTime(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-async function addMusicToPreview(cardEl, artist, song) {
+function addMusicToPreview(cardEl, artist, song) {
   playSound("caption-select");
 
   // Stop anything currently playing
@@ -703,23 +707,20 @@ async function addMusicToPreview(cardEl, artist, song) {
   mtp.classList.remove("hidden");
   updateMtpPlayBtn("loading");
 
-  // Fetch preview URL and pre-load audio
+  // Use cached URL (pre-fetched when music rendered) — no await needed
   previewMusicTrack = { artist, song };
-  previewMusicUrl = null;
-  try {
-    const q = encodeURIComponent(`${artist} ${song}`);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
-    const data = await res.json();
-    previewMusicUrl = data.results?.[0]?.previewUrl || null;
-  } catch {}
+  const key = `${artist} - ${song}`;
+  previewMusicUrl = musicUrlCache[key] || null;
 
   if (previewMusicUrl) {
-    // Pre-load the audio so it's ready when user taps play
-    previewMusicAudio = new Audio(previewMusicUrl);
-    previewMusicAudio.preload = "auto";
-    previewMusicAudio.load();
-    previewMusicAudio.addEventListener("ended", () => updateMtpPlayBtn("stopped"), { once: true });
     updateMtpPlayBtn("stopped");
+  } else if (musicUrlCache[key] === undefined) {
+    // Not in cache yet — fetch it now and update button when ready
+    updateMtpPlayBtn("loading");
+    prefetchMusicUrls([{ artist, song }]).then(() => {
+      previewMusicUrl = musicUrlCache[key] || null;
+      updateMtpPlayBtn(previewMusicUrl ? "stopped" : "unavailable");
+    });
   } else {
     updateMtpPlayBtn("unavailable");
   }
