@@ -458,7 +458,14 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: 
         raise HTTPException(status_code=400, detail="No supported files found")
 
     start_time = time.perf_counter()
-    log.info(f"Processing {len(files)} file(s), {len(all_frames)} frame(s), tone={tone} length={length_level} hashtags={hashtag_count}")
+    log.info(json.dumps({
+        "event": "generate_captions_start",
+        "num_files": len(files),
+        "num_frames": len(all_frames),
+        "tone": tone,
+        "length_level": length_level,
+        "hashtag_count": hashtag_count
+    }))
 
     try:
         result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone, length_level=length_level, hashtag_count=hashtag_count)
