@@ -568,13 +568,6 @@ btnGenerate.addEventListener("click", async () => {
   }
 });
 
-function _debugToast(msg) {
-  const el = document.createElement("div");
-  el.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:10px 18px;border-radius:10px;z-index:99999;font-size:13px;max-width:90vw;word-break:break-all;text-align:center;";
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 6000);
-}
 
 let currentMusicItems = [];
 let currentPreviewBtn = null;
@@ -593,10 +586,8 @@ async function prefetchMusicUrls(tracks) {
       const res = await fetch(`${API_URL}/music-preview?${params}`);
       const data = await res.json();
       musicUrlCache[key] = data.previewUrl || null;
-      if (!data.previewUrl) _debugToast(`No preview found: "${t.artist} - ${t.song}"`);
-    } catch(e) {
+    } catch {
       musicUrlCache[key] = null;
-      _debugToast(`Music fetch error: ${e?.message}`);
     }
   }
 }
@@ -677,7 +668,6 @@ function handlePreview(btn, artist, song) {
   const cached = musicUrlCache[key];
 
   if (cached === undefined || cached === "loading") {
-    _debugToast(`Fetching iTunes URL… key="${key}" state=${cached}`);
     btn.textContent = "…";
     currentPreviewBtn = btn;
     const poll = setInterval(() => {
@@ -685,7 +675,7 @@ function handlePreview(btn, artist, song) {
       if (v === undefined || v === "loading") return;
       clearInterval(poll);
       if (currentPreviewBtn !== btn) return;
-      if (!v) { _debugToast(`iTunes returned no preview for: ${key}`); btn.textContent = "▶"; currentPreviewBtn = null; return; }
+      if (!v) { btn.textContent = "▶"; currentPreviewBtn = null; return; }
       btn.textContent = "▶";
       handlePreview(btn, artist, song);
     }, 150);
@@ -693,17 +683,13 @@ function handlePreview(btn, artist, song) {
   }
 
   if (!cached) {
-    _debugToast(`No iTunes preview found for: ${key}`);
     btn.textContent = "—";
     setTimeout(() => btn.textContent = "▶", 2000);
     return;
   }
 
-  const url = cached;
-  _debugToast(`Playing: ${url.slice(0, 60)}…`);
-  // Reuse pre-unlocked cardAudio — iOS allows play() on elements unlocked in prior gesture
   currentPreviewBtn = btn;
-  cardAudio.src = url;
+  cardAudio.src = cached;
   cardAudio.currentTime = 0;
   cardAudio.onended = () => {
     btn.textContent = "▶";
@@ -713,11 +699,10 @@ function handlePreview(btn, artist, song) {
   cardAudio.play().then(() => {
     btn.textContent = "⏸";
     btn.classList.add("playing");
-  }).catch((err) => {
+  }).catch(() => {
     btn.textContent = "▶";
     btn.classList.remove("playing");
     currentPreviewBtn = null;
-    _debugToast(`play() failed: ${err?.name} — ${err?.message}`);
   });
 }
 
