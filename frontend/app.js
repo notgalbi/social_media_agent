@@ -3,16 +3,20 @@ const API_URL = "https://socialmediaagent-production-83c2.up.railway.app";
 // ── Sound system (Web Audio API — no files needed) ──
 let audioCtx = null;
 
+// Persistent audio elements — created once at startup, unlocked on first touch.
+// iOS only allows .play() on an <audio> element that was previously touched
+// (even a failed play with no src) within a user gesture. Reusing the same
+// element avoids the "new Audio() after await" problem entirely.
+const cardAudio = new Audio(); // for music card ▶ previews
+const trimAudio = new Audio(); // for trim panel
+
 function getAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
 
-// iOS Safari: AudioContext starts suspended and resume() is async, so oscillators
-// scheduled immediately after resume() may never fire. Unlock by playing a silent
-// 1-frame buffer on first touch — touchstart fires before click, so by the time
-// any button handler calls playSound() the context is already running.
+// Unlock AudioContext + both <audio> elements on first touch (capture fires before click).
 (function iosAudioUnlock() {
   function unlock() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -24,8 +28,8 @@ function getAudio() {
       src.connect(audioCtx.destination);
       src.start(0);
     }).catch(() => {});
+    [cardAudio, trimAudio].forEach(a => { a.play().catch(() => {}); a.pause(); });
   }
-  // Use capture=true so this runs before any button handlers
   document.addEventListener("touchstart", unlock, { capture: true, passive: true, once: true });
   document.addEventListener("click",      unlock, { capture: true, once: true });
 })();
@@ -564,9 +568,7 @@ btnGenerate.addEventListener("click", async () => {
 });
 
 let currentMusicItems = [];
-let currentAudio = null;
 let currentPreviewBtn = null;
-let previewMusicAudio = null;
 let previewMusicTrack = null;
 let previewMusicUrl = null;
 let selectedMusicCardEl = null;
@@ -642,13 +644,11 @@ function _drawMusicList() {
 
 function handlePreview(btn, artist, song) {
   // Toggle play/pause on same button
-  if (currentPreviewBtn === btn && currentAudio) {
-    if (currentAudio.paused) {
-      currentAudio.play();
-      btn.textContent = "⏸";
-      btn.classList.add("playing");
+  if (currentPreviewBtn === btn) {
+    if (cardAudio.paused) {
+      cardAudio.play().then(() => { btn.textContent = "⏸"; btn.classList.add("playing"); }).catch(() => {});
     } else {
-      currentAudio.pause();
+      cardAudio.pause();
       btn.textContent = "▶";
       btn.classList.remove("playing");
     }
@@ -656,40 +656,35 @@ function handlePreview(btn, artist, song) {
   }
 
   // Stop any other playing track
-  if (currentAudio) {
-    currentAudio.pause();
-    if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); }
-    currentAudio = null;
-    currentPreviewBtn = null;
-  }
+  cardAudio.pause();
+  if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); }
+  currentPreviewBtn = null;
 
   const key = `${artist} - ${song}`;
   const url = musicUrlCache[key];
 
   if (!url) {
-    // URL not ready yet — show briefly then restore
     btn.textContent = "…";
     setTimeout(() => { if (btn.textContent === "…") btn.textContent = "▶"; }, 1500);
     return;
   }
 
-  // URL is cached — create and play synchronously (iOS Safari requires no awaits)
-  const audio = new Audio(url);
-  currentAudio = audio;
+  // Reuse pre-unlocked cardAudio — iOS allows play() on elements unlocked in prior gesture
   currentPreviewBtn = btn;
-
-  audio.play().then(() => {
+  cardAudio.src = url;
+  cardAudio.currentTime = 0;
+  cardAudio.onended = () => {
+    btn.textContent = "▶";
+    btn.classList.remove("playing");
+    if (currentPreviewBtn === btn) currentPreviewBtn = null;
+  };
+  cardAudio.play().then(() => {
     btn.textContent = "⏸";
     btn.classList.add("playing");
-    audio.addEventListener("ended", () => {
-      btn.textContent = "▶";
-      btn.classList.remove("playing");
-      if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
-    });
   }).catch(() => {
     btn.textContent = "▶";
     btn.classList.remove("playing");
-    if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
+    currentPreviewBtn = null;
   });
 }
 
@@ -704,8 +699,9 @@ function addMusicToPreview(cardEl, artist, song) {
   playSound("caption-select");
 
   // Stop anything currently playing
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); currentPreviewBtn = null; } }
-  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  cardAudio.pause();
+  if (currentPreviewBtn) { currentPreviewBtn.textContent = "▶"; currentPreviewBtn.classList.remove("playing"); currentPreviewBtn = null; }
+  trimAudio.pause();
 
   // Highlight selected card
   if (selectedMusicCardEl) selectedMusicCardEl.classList.remove("preview-selected");
@@ -763,9 +759,8 @@ let mtpStopTimer = null;
 document.getElementById("mtp-play").addEventListener("click", () => {
   if (!previewMusicUrl) return;
 
-  // Pause if already playing
-  if (previewMusicAudio && !previewMusicAudio.paused) {
-    previewMusicAudio.pause();
+  if (!trimAudio.paused) {
+    trimAudio.pause();
     clearTimeout(mtpStopTimer);
     updateMtpPlayBtn("stopped");
     return;
@@ -774,21 +769,16 @@ document.getElementById("mtp-play").addEventListener("click", () => {
   const startSec = parseFloat(document.getElementById("mtp-start").value);
   const lengthSec = parseFloat(document.getElementById("mtp-length").value);
 
-  // Always create Audio synchronously here (iOS Safari: user-gesture context must be
-  // synchronous — Audio created in an async function loses playback permission)
-  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
-  previewMusicAudio = new Audio(previewMusicUrl);
-  previewMusicAudio.currentTime = startSec;
-  previewMusicAudio.addEventListener("ended", () => updateMtpPlayBtn("stopped"), { once: true });
+  // Reuse pre-unlocked trimAudio — set src and play synchronously
+  trimAudio.src = previewMusicUrl;
+  trimAudio.currentTime = startSec;
+  trimAudio.onended = () => updateMtpPlayBtn("stopped");
 
-  previewMusicAudio.play().then(() => {
+  trimAudio.play().then(() => {
     updateMtpPlayBtn("playing");
     clearTimeout(mtpStopTimer);
     mtpStopTimer = setTimeout(() => {
-      if (previewMusicAudio && !previewMusicAudio.paused) {
-        previewMusicAudio.pause();
-        updateMtpPlayBtn("stopped");
-      }
+      if (!trimAudio.paused) { trimAudio.pause(); updateMtpPlayBtn("stopped"); }
     }, lengthSec * 1000);
   }).catch(() => updateMtpPlayBtn("stopped"));
 });
@@ -804,7 +794,7 @@ document.getElementById("mtp-start").addEventListener("input", e => {
     lengthEl.value = maxLen;
     document.getElementById("mtp-length-val").textContent = fmtTime(maxLen);
   }
-  if (previewMusicAudio) previewMusicAudio.currentTime = startSec;
+  if (!trimAudio.paused) trimAudio.currentTime = startSec;
 });
 
 // Length slider — cap start so start + length ≤ 30
@@ -817,13 +807,14 @@ document.getElementById("mtp-length").addEventListener("input", e => {
   if (parseFloat(startEl.value) > maxStart) {
     startEl.value = maxStart;
     document.getElementById("mtp-start-val").textContent = fmtTime(maxStart);
-    if (previewMusicAudio) previewMusicAudio.currentTime = maxStart;
+    if (!trimAudio.paused) trimAudio.currentTime = maxStart;
   }
 });
 
 // Remove music from preview
 document.getElementById("mtp-remove").addEventListener("click", () => {
-  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  trimAudio.pause();
+  trimAudio.src = "";
   clearTimeout(mtpStopTimer);
   previewMusicUrl = null;
   previewMusicTrack = null;
@@ -991,7 +982,7 @@ btnNew.addEventListener("click", () => {
   document.getElementById("post-preview").classList.add("hidden");
   document.getElementById("ig-music-bar")?.classList.add("hidden");
   document.getElementById("mtp").classList.add("hidden");
-  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  trimAudio.pause(); trimAudio.src = "";
   if (selectedMusicCardEl) { selectedMusicCardEl.classList.remove("preview-selected"); selectedMusicCardEl = null; }
   previewMusicUrl = null;
   showScreen("screen-upload");
