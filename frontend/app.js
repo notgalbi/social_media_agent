@@ -858,7 +858,7 @@ function selectCaption(card, text) {
   captionEdit.value = text;
   updatePostPreview(text);
   selectedWrap.classList.remove("hidden");
-  selectedWrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  document.getElementById("post-preview").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function updatePostPreview(text) {
