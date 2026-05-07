@@ -130,25 +130,108 @@ function playSound(type) {
   } catch {}
 }
 
-// ── Particle background ──
-function spawnParticles() {
-  const container = document.getElementById("particles");
-  const colors = ["#f7c5d2", "#e8b97a", "#c8e6c8", "#f0dde5", "#fde8ed"];
-  for (let i = 0; i < 18; i++) {
-    const p = document.createElement("div");
-    p.className = "particle";
-    const size = Math.random() * 10 + 4;
-    p.style.cssText = `
-      width: ${size}px; height: ${size}px;
-      left: ${Math.random() * 100}%;
-      background: ${colors[Math.floor(Math.random() * colors.length)]};
-      animation-duration: ${Math.random() * 12 + 10}s;
-      animation-delay: ${Math.random() * 10}s;
-    `;
-    container.appendChild(p);
+// ── 3D Canvas starfield ──
+(function () {
+  const canvas = document.getElementById("bg-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const COLORS = ["#ffffff", "#f7c5d2", "#fde8ed", "#e8b97a", "#f0dde5", "#d4c8f0"];
+  let W = 0, H = 0, stars = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
   }
-}
-spawnParticles();
+
+  function makeStar(fromTop) {
+    const z = Math.random();              // 0 = far, 1 = close
+    return {
+      x:       Math.random() * W,
+      y:       fromTop ? -(Math.random() * 20) : Math.random() * H,
+      z,
+      r:       0.3 + z * 2.6,            // close stars bigger
+      speed:   0.12 + z * 1.0,           // close stars faster
+      drift:   (Math.random() - 0.5) * 0.18,
+      color:   COLORS[Math.floor(Math.random() * COLORS.length)],
+      alpha:   0.12 + z * 0.72,
+      phase:   Math.random() * Math.PI * 2,
+      freq:    0.012 + Math.random() * 0.028,
+      sparkle: z > 0.72 && Math.random() > 0.45, // close ones get cross shape
+    };
+  }
+
+  function init() {
+    stars = Array.from({ length: 180 }, () => makeStar(false));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+
+      // Move
+      s.y += s.speed;
+      s.x += s.drift;
+      s.phase += s.freq;
+
+      // Recycle off-screen stars
+      if (s.y > H + 12) { stars[i] = makeStar(true); continue; }
+      if (s.x < -12) s.x = W + 12;
+      if (s.x > W + 12) s.x = -12;
+
+      const twinkle = 0.6 + 0.4 * Math.sin(s.phase);
+      const a = s.alpha * twinkle;
+
+      // Sparkle cross shape for close-layer stars
+      if (s.sparkle) {
+        const arm = s.r * 2.2;
+        ctx.save();
+        ctx.globalAlpha = a * 0.55;
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = s.r * 0.45;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(s.x - arm, s.y);     ctx.lineTo(s.x + arm, s.y);
+        ctx.moveTo(s.x, s.y - arm);     ctx.lineTo(s.x, s.y + arm);
+        ctx.moveTo(s.x - arm * 0.6, s.y - arm * 0.6);
+        ctx.lineTo(s.x + arm * 0.6, s.y + arm * 0.6);
+        ctx.moveTo(s.x + arm * 0.6, s.y - arm * 0.6);
+        ctx.lineTo(s.x - arm * 0.6, s.y + arm * 0.6);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Core dot
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.globalAlpha = a;
+      ctx.fill();
+
+      // Soft glow halo on close stars
+      if (s.z > 0.55) {
+        const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 5);
+        glow.addColorStop(0, s.color);
+        glow.addColorStop(1, "transparent");
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 5, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.globalAlpha = a * 0.28;
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  window.addEventListener("resize", () => { resize(); init(); });
+  init();
+  draw();
+})();
 
 // ── Ripple effect on buttons ──
 document.addEventListener("click", e => {

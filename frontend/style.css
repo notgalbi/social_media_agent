@@ -60,27 +60,12 @@ body::before {
   to   { opacity: 1; }
 }
 
-/* ── Particles ── */
-.particles {
+/* ── Canvas starfield ── */
+#bg-canvas {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  overflow: hidden;
-}
-
-.particle {
-  position: absolute;
-  border-radius: 50%;
-  animation: floatParticle linear infinite;
-  opacity: 0;
-}
-
-@keyframes floatParticle {
-  0%   { transform: translateY(100vh) scale(0); opacity: 0; }
-  10%  { opacity: 0.6; }
-  90%  { opacity: 0.3; }
-  100% { transform: translateY(-100px) scale(1); opacity: 0; }
 }
 
 /* ── App shell ── */
