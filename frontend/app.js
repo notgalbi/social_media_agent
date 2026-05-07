@@ -531,6 +531,10 @@ btnGenerate.addEventListener("click", async () => {
 let currentMusicItems = [];
 let currentAudio = null;
 let currentPreviewBtn = null;
+let previewMusicAudio = null;
+let previewMusicTrack = null;
+let previewMusicUrl = null;
+let selectedMusicCardEl = null;
 
 function renderMusic(music) {
   currentMusicItems = music ? [...music] : [];
@@ -561,6 +565,7 @@ function _drawMusicList() {
       </div>
       <button class="music-preview" title="Preview 30s">▶</button>
       <button class="music-copy" title="Copy" data-text="${artist} - ${song}">⎘</button>
+      <button class="music-add-preview" title="Add to post preview">+ Use</button>
     `;
 
     const previewBtn = el.querySelector(".music-preview");
@@ -572,6 +577,10 @@ function _drawMusicList() {
       try { await navigator.clipboard.writeText(text); } catch {}
       e.currentTarget.textContent = "✓";
       setTimeout(() => e.currentTarget.textContent = "⎘", 2000);
+    });
+
+    el.querySelector(".music-add-preview").addEventListener("click", () => {
+      addMusicToPreview(el, track.artist, track.song);
     });
 
     list.appendChild(el);
@@ -644,6 +653,111 @@ async function handlePreview(btn, artist, song) {
     if (currentAudio === audio) { currentAudio = null; currentPreviewBtn = null; }
   }
 }
+
+// ── Music → Preview integration ──
+
+function fmtTime(sec) {
+  const s = Math.floor(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+async function addMusicToPreview(cardEl, artist, song) {
+  playSound("caption-select");
+
+  // Highlight selected card
+  if (selectedMusicCardEl) selectedMusicCardEl.classList.remove("preview-selected");
+  selectedMusicCardEl = cardEl;
+  cardEl.classList.add("preview-selected");
+
+  // Stop any current trim audio
+  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  updateMtpPlayBtn(false);
+
+  // Show music bar on preview card with track name
+  const bar = document.getElementById("ig-music-bar");
+  const scrollText = document.getElementById("ig-music-scroll-text");
+  if (bar) {
+    scrollText.textContent = `${artist} — ${song}`;
+    bar.classList.remove("hidden");
+  }
+
+  // Show trim panel
+  const mtp = document.getElementById("mtp");
+  document.getElementById("mtp-info").textContent = `${artist} — ${song}`;
+  document.getElementById("mtp-start").value = 0;
+  document.getElementById("mtp-length").value = 15;
+  document.getElementById("mtp-start-val").textContent = "0:00";
+  document.getElementById("mtp-length-val").textContent = "0:15";
+  mtp.classList.remove("hidden");
+
+  // Fetch iTunes preview URL in background
+  previewMusicTrack = { artist, song };
+  previewMusicUrl = null;
+  try {
+    const q = encodeURIComponent(`${artist} ${song}`);
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
+    const data = await res.json();
+    previewMusicUrl = data.results?.[0]?.previewUrl || null;
+  } catch {}
+}
+
+function updateMtpPlayBtn(playing) {
+  const btn = document.getElementById("mtp-play");
+  if (!btn) return;
+  btn.textContent = playing ? "⏸" : "▶";
+  playing ? btn.classList.add("playing") : btn.classList.remove("playing");
+}
+
+// Trim panel — play/pause
+document.getElementById("mtp-play").addEventListener("click", () => {
+  if (!previewMusicUrl) return;
+
+  if (previewMusicAudio && !previewMusicAudio.paused) {
+    previewMusicAudio.pause();
+    updateMtpPlayBtn(false);
+    return;
+  }
+
+  const startSec = parseFloat(document.getElementById("mtp-start").value);
+  const lengthSec = parseFloat(document.getElementById("mtp-length").value);
+
+  if (!previewMusicAudio) previewMusicAudio = new Audio(previewMusicUrl);
+  previewMusicAudio.currentTime = startSec;
+  previewMusicAudio.play().then(() => {
+    updateMtpPlayBtn(true);
+    // Auto-stop after selected length
+    setTimeout(() => {
+      if (previewMusicAudio && !previewMusicAudio.paused) {
+        previewMusicAudio.pause();
+        updateMtpPlayBtn(false);
+      }
+    }, lengthSec * 1000);
+  }).catch(() => updateMtpPlayBtn(false));
+
+  previewMusicAudio.addEventListener("ended", () => updateMtpPlayBtn(false), { once: true });
+});
+
+// Start slider
+document.getElementById("mtp-start").addEventListener("input", e => {
+  document.getElementById("mtp-start-val").textContent = fmtTime(e.target.value);
+  if (previewMusicAudio) previewMusicAudio.currentTime = parseFloat(e.target.value);
+});
+
+// Length slider
+document.getElementById("mtp-length").addEventListener("input", e => {
+  document.getElementById("mtp-length-val").textContent = fmtTime(e.target.value);
+});
+
+// Remove music from preview
+document.getElementById("mtp-remove").addEventListener("click", () => {
+  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  previewMusicUrl = null;
+  previewMusicTrack = null;
+  if (selectedMusicCardEl) { selectedMusicCardEl.classList.remove("preview-selected"); selectedMusicCardEl = null; }
+  document.getElementById("ig-music-bar")?.classList.add("hidden");
+  document.getElementById("mtp").classList.add("hidden");
+  updateMtpPlayBtn(false);
+});
 
 // Custom song input
 document.getElementById("btn-add-song").addEventListener("click", () => {
@@ -800,6 +914,11 @@ btnNew.addEventListener("click", () => {
   captionList.innerHTML = "";
   selectedWrap.classList.add("hidden");
   document.getElementById("post-preview").classList.add("hidden");
+  document.getElementById("ig-music-bar")?.classList.add("hidden");
+  document.getElementById("mtp").classList.add("hidden");
+  if (previewMusicAudio) { previewMusicAudio.pause(); previewMusicAudio = null; }
+  if (selectedMusicCardEl) { selectedMusicCardEl.classList.remove("preview-selected"); selectedMusicCardEl = null; }
+  previewMusicUrl = null;
   showScreen("screen-upload");
 });
 
