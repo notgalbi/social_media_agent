@@ -6,6 +6,8 @@ import base64
 import logging
 import tempfile
 import secrets
+import io
+import time
 from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlencode
@@ -16,20 +18,17 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 import httpx
 import anthropic
 import cv2
+from PIL import Image
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-log = logging.getLogger(__name__)
+log = logging.getLogger("uvicorn.error")
 
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 if SENTRY_DSN:
@@ -40,7 +39,7 @@ if SENTRY_DSN:
         profiles_sample_rate=0.5,
         send_default_pii=False,
     )
-    log.info("Sentry initialized")
+    log.debug("Sentry initialized")
 
 STORE_PATH = Path(__file__).parent / "captions_store.json"
 UPLOADS_DIR = Path(__file__).parent / "uploads"
@@ -180,13 +179,12 @@ MAX_B64_BYTES = 4 * 1024 * 1024  # 4 MB base64 — Claude hard limit is 5 MB bas
 
 def compress_to_b64(img_bytes: bytes, max_b64_bytes: int = MAX_B64_BYTES) -> str:
     """Resize + re-encode until the base64 output is under max_b64_bytes."""
-    import io
-    from PIL import Image
+    start_time = time.perf_counter()
+    original_size = len(img_bytes)
 
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     quality = 85
     scale = 1.0
-
     while True:
         buf = io.BytesIO()
         w = int(img.width * scale)
@@ -195,6 +193,14 @@ def compress_to_b64(img_bytes: bytes, max_b64_bytes: int = MAX_B64_BYTES) -> str
         resized.save(buf, format="JPEG", quality=quality)
         b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
         if len(b64) <= max_b64_bytes:
+            duration = time.perf_counter() - start_time
+            log_data = {
+                "event": "compress_to_b64",
+                "original_bytes": original_size,
+                "final_b64_bytes": len(b64),
+                "duration_s": round(duration, 3)
+            }
+            log.info(json.dumps(log_data))
             return b64
         if quality > 55:
             quality -= 10
@@ -304,12 +310,14 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
         )
     })
 
+    start_time = time.perf_counter()
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=700,
         system=system,
         messages=[{"role": "user", "content": content}],
     )
+    duration = time.perf_counter() - start_time
 
     raw = message.content[0].text
     usage = message.usage
@@ -318,7 +326,16 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     # Haiku pricing: $0.80/M input, $4.00/M output
     cost_usd = (input_tokens * 0.0000008) + (output_tokens * 0.000004)
 
-    log.info(f"Tokens — in:{input_tokens} out:{output_tokens} cost:${cost_usd:.5f}")
+    log_data = {
+        "event": "generate_content",
+        "tone": tone,
+        "num_source_files": num_source_files,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cost_usd": round(cost_usd, 5),
+        "duration_s": round(duration, 3),
+    }
+    log.info(json.dumps(log_data))
     TOKEN_STATS["total_input"]  += input_tokens
     TOKEN_STATS["total_output"] += output_tokens
     TOKEN_STATS["total_cost"]   += cost_usd
@@ -368,20 +385,40 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: 
     if not all_frames:
         raise HTTPException(status_code=400, detail="No supported files found")
 
-    log.info(f"Processing {len(files)} file(s), {len(all_frames)} frame(s), tone={tone}")
+    start_time = time.perf_counter()
+    start_log = {
+        "event": "generate_captions_start",
+        "num_files": len(files),
+        "num_frames": len(all_frames),
+        "tone": tone
+    }
+    log.info(json.dumps(start_log))
 
     try:
         result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone)
-        log.info(f"Generated: {result}")
+        duration = time.perf_counter() - start_time
+        success_log = {
+            "event": "generate_captions_success",
+            "duration_s": round(duration, 3),
+            "num_captions": len(result.get("captions", [])),
+            "num_music": len(result.get("music", []))
+        }
+        log.info(json.dumps(success_log))
         return result
     except Exception as e:
-        log.error(f"Caption generation failed: {e}", exc_info=True)
+        duration = time.perf_counter() - start_time
+        error_log = {
+            "event": "generate_captions_error",
+            "error": str(e),
+            "duration_s": round(duration, 3)
+        }
+        log.error(json.dumps(error_log), exc_info=True)
         LOG_ENTRIES.append({
             "time": datetime.now(timezone.utc).isoformat(),
             "method": "POST",
             "path": "/generate-captions",
             "status": 500,
-            "duration_s": 0,
+            "duration_s": round(duration, 3),
             "error": str(e),
         })
         raise HTTPException(status_code=500, detail=str(e))
@@ -470,7 +507,7 @@ async def save_buffer_token(payload: BufferTokenPayload):
     store["buffer_access_token"] = payload.access_token
     store["buffer_profile_id"] = payload.profile_id
     save_store(store)
-    log.info(f"Buffer connected: profile_id={payload.profile_id}")
+    log.info(json.dumps({"event": "buffer_connected", "profile_id": payload.profile_id}))
 
     # auto-sync Instagram captions to train Claude on their voice
     if payload.access_token and payload.profile_id:
@@ -481,9 +518,9 @@ async def save_buffer_token(payload: BufferTokenPayload):
             if ig_captions:
                 store["example_captions"] = ig_captions
                 save_store(store)
-                log.info(f"Auto-synced {len(ig_captions)} captions from Instagram profile")
+                log.info(json.dumps({"event": "buffer_auto_sync_captions_success", "num_captions": len(ig_captions)}))
         except Exception as e:
-            log.warning(f"Auto-sync captions failed (non-fatal): {e}")
+            log.warning(json.dumps({"event": "buffer_auto_sync_captions_failed", "error": str(e)}))
 
     return {"status": "saved"}
 
@@ -560,7 +597,7 @@ async def instagram_login():
 async def instagram_callback(code: str = None, error: str = None):
     """Handle OAuth callback from Meta."""
     if error or not code:
-        log.error(f"OAuth error: {error}")
+        log.error(json.dumps({"event": "instagram_oauth_error", "error": str(error)}))
         return RedirectResponse(f"{FRONTEND_URL}?auth=error")
 
     # Exchange code for access token
@@ -576,7 +613,7 @@ async def instagram_callback(code: str = None, error: str = None):
         )
 
     if token_res.status_code != 200:
-        log.error(f"Token exchange failed: {token_res.text}")
+        log.error(json.dumps({"event": "instagram_token_exchange_failed", "error": token_res.text, "status_code": token_res.status_code}))
         return RedirectResponse(f"{FRONTEND_URL}?auth=error")
 
     token_data = token_res.json()
@@ -646,11 +683,11 @@ async def instagram_callback(code: str = None, error: str = None):
                 if captions:
                     store["example_captions"] = captions
                     save_store(store)
-                    log.info(f"Auto-synced {len(captions)} captions for @{ig_username}")
+                    log.info(json.dumps({"event": "instagram_auto_sync_captions_success", "num_captions": len(captions), "username": ig_username}))
         except Exception as e:
-            log.warning(f"Caption sync failed: {e}")
+            log.warning(json.dumps({"event": "instagram_caption_sync_failed", "error": str(e)}))
 
-    log.info(f"Instagram connected: @{ig_username} (id={ig_user_id})")
+    log.info(json.dumps({"event": "instagram_connected", "username": ig_username, "user_id": ig_user_id}))
     return RedirectResponse(f"{FRONTEND_URL}?auth=success&username={ig_username}")
 
 
@@ -713,7 +750,13 @@ async def log_requests(request: Request, call_next):
     LOG_ENTRIES.append(entry)
     if len(LOG_ENTRIES) > 200:
         LOG_ENTRIES.pop(0)
-    log.info(f"{request.method} {request.url.path} → {response.status_code} ({duration:.2f}s)")
+    log.info(json.dumps({
+        "event": "http_request",
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+        "duration_s": round(duration, 3)
+    }))
     return response
 
 
