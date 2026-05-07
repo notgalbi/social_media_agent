@@ -162,102 +162,180 @@ function playSound(type) {
   } catch {}
 }
 
-// ── Sakura petal canvas ──
+// ── Sakura tree canvas ──
 (function () {
   const canvas = document.getElementById("bg-canvas");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
-  const COLORS = [
-    "rgba(240,200,212,0.75)",
-    "rgba(232,180,192,0.65)",
-    "rgba(248,220,228,0.85)",
-    "rgba(220,155,175,0.60)",
-    "rgba(252,238,242,0.80)"
-  ];
-  let W = 0, H = 0, petals = [];
 
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+  let W, H, branches, blossomClusters, fallingPetals, growProg = 0, lastT = 0;
+
+  const DEPTH = 8;
+  const PETAL_COLORS = [
+    [255, 218, 230], [248, 198, 214], [255, 232, 240],
+    [238, 182, 204], [252, 208, 224], [255, 242, 246],
+  ];
+
+  function buildTree() {
+    branches = [];
+    blossomClusters = [];
+    fallingPetals = [];
+    growProg = 0;
+
+    const cx = W * 0.48, cy = H + 2;
+    const trunkLen = H * 0.24;
+
+    function addBranch(x1, y1, ang, len, depth) {
+      if (depth === 0 || len < 3) return;
+      const x2 = x1 + Math.sin(ang) * len;
+      const y2 = y1 - Math.cos(ang) * len;
+      const t = (DEPTH - depth) / (DEPTH - 1); // 0=trunk … 1=tips
+      branches.push({ x1, y1, x2, y2, t,
+        width: Math.max(0.6, (1 - t) * 11 + 0.6),
+        r: Math.round(52 + t * 78), g: Math.round(28 + t * 40), b: Math.round(14 + t * 22),
+        opacity: 0.88 - t * 0.28,
+      });
+
+      if (depth === 1) {
+        const n = 5 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < n; i++) {
+          const c = PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)];
+          blossomClusters.push({
+            x: x2 + (Math.random() - 0.5) * 20,
+            y: y2 + (Math.random() - 0.5) * 20,
+            r: 3 + Math.random() * 4.5,
+            alpha: 0, targetAlpha: 0.75 + Math.random() * 0.25, c,
+            wobble: Math.random() * Math.PI * 2,
+          });
+        }
+        return;
+      }
+
+      const spread = 0.28 + Math.random() * 0.20;
+      const lf     = 0.60 + Math.random() * 0.12;
+      const jit    = () => (Math.random() - 0.5) * 0.07;
+      addBranch(x2, y2, ang - spread + jit(), len * lf, depth - 1);
+      addBranch(x2, y2, ang + spread + jit(), len * lf, depth - 1);
+      if (depth > 3 && Math.random() > 0.52)
+        addBranch(x2, y2, ang + jit() * 3, len * (0.42 + Math.random() * 0.1), depth - 2);
+    }
+
+    addBranch(cx, cy, 0, trunkLen, DEPTH);
+    branches.sort((a, b) => a.t - b.t); // trunk first
+    fallingPetals = Array.from({ length: 28 }, () => newFallingPetal(true));
   }
 
-  function makePetal(fromTop) {
-    const z = Math.random(); // 0 = far/small/slow, 1 = close/large/fast
+  function newFallingPetal(scatter) {
+    const z = 0.25 + Math.random() * 0.75;
     return {
-      x:         Math.random() * W,
-      y:         fromTop ? -(Math.random() * 40 + 10) : Math.random() * H,
-      z,
-      size:      4 + z * 13,
-      speed:     0.15 + z * 1.2,
-      drift:     (Math.random() - 0.5) * 0.5,
-      rot:       Math.random() * Math.PI * 2,
-      rotSpeed:  (Math.random() - 0.5) * 0.03,
-      swayPhase: Math.random() * Math.PI * 2,
-      swayFreq:  0.008 + Math.random() * 0.014,
-      color:     COLORS[Math.floor(Math.random() * COLORS.length)],
-      alpha:     0.25 + z * 0.50,
+      x: Math.random() * W,
+      y: scatter ? Math.random() * H : -(10 + Math.random() * 30),
+      z, size: 3.5 + z * 9,
+      vy: 0.35 + z * 1.1,
+      vx: (Math.random() - 0.5) * 0.6,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.035,
+      swayPh: Math.random() * Math.PI * 2,
+      swayF: 0.35 + Math.random() * 0.55,
+      alpha: 0.28 + z * 0.48,
+      c: PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)],
     };
   }
 
-  function drawPetal(p) {
-    const size = p.size;
+  function drawFallingPetal(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
     ctx.globalAlpha = p.alpha;
-
-    // Draw 5 petals as ellipses rotated around the center
-    ctx.fillStyle = p.color;
     for (let i = 0; i < 5; i++) {
       ctx.save();
       ctx.rotate(i * Math.PI * 2 / 5);
       ctx.beginPath();
-      ctx.ellipse(0, -size * 0.5, size * 0.28, size * 0.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, -p.size * 0.54, p.size * 0.27, p.size * 0.54, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.c.join(",")},1)`;
       ctx.fill();
       ctx.restore();
     }
-
-    // Small center dot
-    ctx.beginPath();
-    ctx.arc(0, 0, size * 0.15, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,230,235,0.9)";
-    ctx.fill();
-
     ctx.restore();
   }
 
-  function init() {
-    petals = Array.from({ length: 40 }, () => makePetal(false));
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    buildTree();
   }
 
-  function draw() {
+  function animate(t) {
+    const dt = Math.min((t - lastT) / 1000, 0.05);
+    lastT = t;
     ctx.clearRect(0, 0, W, H);
 
-    for (let i = 0; i < petals.length; i++) {
-      const p = petals[i];
+    // Tree grows over ~3.8 s
+    if (growProg < 1) growProg = Math.min(1, growProg + dt * 0.26);
 
-      // Move down + sinusoidal sway
-      p.y += p.speed;
-      p.swayPhase += p.swayFreq;
-      p.x += p.drift + Math.sin(p.swayPhase) * 0.55;
-      p.rot += p.rotSpeed;
+    // ── Branches ──
+    ctx.lineCap = "round";
+    branches.forEach(b => {
+      // staggered: trunk at growProg=0, tips at growProg≈0.82
+      const localProg = Math.max(0, Math.min(1, (growProg - b.t * 0.80) / 0.20));
+      if (localProg <= 0) return;
+      const ex = b.x1 + (b.x2 - b.x1) * localProg;
+      const ey = b.y1 + (b.y2 - b.y1) * localProg;
+      ctx.beginPath();
+      ctx.moveTo(b.x1, b.y1);
+      ctx.lineTo(ex, ey);
+      ctx.lineWidth = b.width;
+      ctx.strokeStyle = `rgba(${b.r},${b.g},${b.b},${b.opacity})`;
+      ctx.stroke();
+    });
 
-      // Recycle when off-screen
-      if (p.y > H + 20) { petals[i] = makePetal(true); continue; }
-      if (p.x < -20) p.x = W + 20;
-      if (p.x > W + 20) p.x = -20;
+    // ── Blossoms ──
+    const blossomTarget = Math.max(0, (growProg - 0.68) / 0.32);
+    blossomClusters.forEach(bl => {
+      bl.alpha += (bl.targetAlpha * blossomTarget - bl.alpha) * 0.04;
+      if (bl.alpha < 0.01) return;
+      bl.wobble += 0.008;
+      const wx = Math.sin(bl.wobble) * 0.4;
+      ctx.save();
+      ctx.translate(bl.x + wx, bl.y);
+      ctx.globalAlpha = bl.alpha;
+      for (let i = 0; i < 5; i++) {
+        ctx.save();
+        ctx.rotate(i * Math.PI * 2 / 5);
+        ctx.beginPath();
+        ctx.ellipse(0, -bl.r * 0.62, bl.r * 0.36, bl.r * 0.62, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgb(${bl.c.join(",")})`;
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, bl.r * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,242,248,0.95)";
+      ctx.fill();
+      ctx.restore();
+    });
 
-      drawPetal(p);
+    // ── Falling petals (after tree starts blooming) ──
+    if (growProg > 0.35) {
+      const petalOpacity = Math.min(1, (growProg - 0.35) / 0.25);
+      fallingPetals.forEach((p, i) => {
+        p.y  += p.vy;
+        p.x  += p.vx + Math.sin(t * 0.001 * p.swayF + p.swayPh) * 0.55;
+        p.rot += p.rotV;
+        if (p.y > H + 24 || p.x < -40 || p.x > W + 40)
+          fallingPetals[i] = newFallingPetal(false);
+        ctx.globalAlpha = p.alpha * petalOpacity;
+        drawFallingPetal(p);
+      });
     }
 
     ctx.globalAlpha = 1;
-    requestAnimationFrame(draw);
+    requestAnimationFrame(animate);
   }
 
+  window.addEventListener("resize", resize);
   resize();
-  window.addEventListener("resize", () => { resize(); init(); });
-  init();
-  draw();
+  requestAnimationFrame(t => { lastT = t; animate(t); });
 })();
 
 // ── Ripple effect on buttons ──
