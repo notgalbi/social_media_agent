@@ -3,10 +3,10 @@ const API_URL = "https://socialmediaagent-production-83c2.up.railway.app";
 // ── Sound system (Web Audio API — no files needed) ──
 let audioCtx = null;
 
-// Persistent audio elements — created once at startup, unlocked on first touch.
-// iOS only allows .play() on an <audio> element that was previously touched
-// (even a failed play with no src) within a user gesture. Reusing the same
-// element avoids the "new Audio() after await" problem entirely.
+// Minimal silent WAV — used to unlock <audio> elements on iOS.
+// iOS only unlocks an element when play() *succeeds*, so we need a real src.
+const SILENT_SRC = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAESsAAABAAgAZGF0YQAAAAA=";
+
 const cardAudio = new Audio(); // for music card ▶ previews
 const trimAudio = new Audio(); // for trim panel
 
@@ -28,7 +28,10 @@ function getAudio() {
       src.connect(audioCtx.destination);
       src.start(0);
     }).catch(() => {});
-    [cardAudio, trimAudio].forEach(a => { a.play().catch(() => {}); a.pause(); });
+    [cardAudio, trimAudio].forEach(a => {
+      a.src = SILENT_SRC;
+      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+    });
   }
   document.addEventListener("touchstart", unlock, { capture: true, passive: true, once: true });
   document.addEventListener("click",      unlock, { capture: true, once: true });
