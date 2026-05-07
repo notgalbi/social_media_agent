@@ -422,6 +422,55 @@ body::before {
 
 .btn-clear:hover { color: var(--accent); }
 
+/* ── Tone selector ── */
+.tone-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tone-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+
+.tone-pills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.tone-pill {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  white-space: nowrap;
+}
+
+.tone-pill:hover {
+  border-color: var(--accent-light);
+  background: var(--surface2);
+  transform: translateY(-1px);
+}
+
+.tone-pill.active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(212, 96, 124, 0.35);
+  transform: translateY(-1px);
+}
+
 /* ── Buttons ── */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);

@@ -284,6 +284,17 @@ const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 
 let selectedFiles = [];
 let selectedCaption = "";
+let selectedTone = "auto";
+
+// Tone pill selection
+document.querySelectorAll(".tone-pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    document.querySelectorAll(".tone-pill").forEach(p => p.classList.remove("active"));
+    pill.classList.add("active");
+    selectedTone = pill.dataset.tone;
+    playSound("click");
+  });
+});
 
 // Keep backend warm
 setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
@@ -486,13 +497,15 @@ btnGenerate.addEventListener("click", async () => {
 
   const formData = new FormData();
   selectedFiles.forEach(f => formData.append("files", f));
+  formData.append("tone", selectedTone);
 
   const loaderText = document.getElementById("loader-text");
   const isCarousel = selectedFiles.length > 1;
+  const toneLabel = { auto: "the vibe", aesthetic: "aesthetic", bold: "bold energy", relatable: "the feels", romantic: "the romance", motivational: "the motivation" }[selectedTone] || "the vibe";
   const messages = [
     "Reading your content...",
-    isCarousel ? `Analyzing ${selectedFiles.length} photos...` : "Analyzing the photo...",
-    "Writing captions...",
+    isCarousel ? `Analyzing ${selectedFiles.length} photos...` : "Catching the aesthetic...",
+    `Writing captions for ${toneLabel}...`,
   ];
   let msgIdx = 0;
   const msgInterval = setInterval(() => {

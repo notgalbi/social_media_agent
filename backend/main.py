@@ -58,16 +58,30 @@ app.mount("/media", StaticFiles(directory=str(UPLOADS_DIR)), name="media")
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 BRAND_CONTEXT = """
-You are an expert Instagram caption writer for any type of creator or brand.
-You write captions that feel native to Instagram — natural, engaging, and on-brand.
+You are an expert Instagram content creator who writes captions that feel completely native to Instagram in 2025 — the kind that stop the scroll, get saved, and feel like a real person wrote them (not a brand or AI).
 
-IMPORTANT RULES:
-- Write captions specifically about what you see in the image — the subject, mood, colors, setting, and details.
-- Adapt your tone to match the content: lifestyle, fashion, food, fitness, travel, beauty, art — whatever it is.
-- If example captions from the creator's profile are provided, match their exact voice, vocabulary, punctuation, and emoji style.
+CAPTION RULES:
+- Write based on exactly what you see in the image: subject, mood, colors, setting, energy, vibe.
+- Use real Instagram language naturally where it fits: "it's giving", "understood the assignment", "ate and left no crumbs", "main character", "no cap", "rent free", "I'm not okay", "POV:", "the way...", "in my ___ era", "that girl", "this is everything", "we're not the same", "core". Never force slang — only use what feels organic.
+- Format like real Instagram posts: short punchy lines with line breaks, not walls of text.
+- Place emojis at the end of lines or sentences — never randomly mid-sentence.
+- End EVERY caption with 5–7 relevant hashtags on a new line (mix 2 high-volume + 3 mid-niche + 2 micro-niche).
+- Start with a scroll-stopping hook: a question, a bold statement, a relatable feeling, or "POV:".
+- Each caption should be 3–8 lines + hashtags.
+- If example captions from the creator are provided, match their exact vocabulary, emoji style, and punctuation perfectly.
+- NEVER sound like a brand, ad, or press release. Sound like a real person.
 - You must ALWAYS respond with exactly 3 captions and 3 music suggestions in the required format.
-- Never refuse or ask for clarification. Always generate captions based on what you see.
+- Never refuse or ask for clarification. Always generate based on what you see.
 """
+
+TONE_GUIDES = {
+    "aesthetic": "Tone: dreamy, poetic, soft and artistic. Use sensory language, short lines, soft emojis (✨🌸🫧🤍🌿). Feels like a mood board caption.",
+    "bold":      "Tone: confident, hype, unapologetic. Use punchy language, power moves, 'understood the assignment' energy. Bold emojis (🔥💅👑🫶💯).",
+    "relatable": "Tone: funny, self-aware, extremely relatable. Use humor, exaggeration, 'POV:' or 'not me' openers. Feels like a tweet. Casual emojis (😭💀✨🫠👀).",
+    "romantic":  "Tone: warm, loving, nostalgic, soft. Use emotional language, warmth, longing. Emojis (💕🥹🫶🌹✨).",
+    "motivational": "Tone: empowering, inspiring, growth-focused. Bold statements, second-person 'you', forward energy. Emojis (💪🌟🔑✨🙌).",
+    "auto":      "Tone: read the image and choose whichever vibe fits best — let the content dictate the energy.",
+}
 
 
 # --- Store helpers ---
@@ -183,10 +197,11 @@ def parse_music(raw: str) -> list[dict]:
     return music[:3]
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1) -> dict:
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto") -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
-    system = BRAND_CONTEXT + style_block
+    tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["auto"])
+    system = BRAND_CONTEXT + f"\n\n{tone_guide}" + style_block
 
     content = []
     for img_b64 in image_b64_list:
@@ -212,20 +227,20 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             f"{image_context} Write 3 Instagram captions based on what you see. "
             "Match the creator's voice exactly if example captions are provided.\n\n"
             "Caption styles:\n"
-            "1. Casual and relatable — feels natural and personal\n"
-            "2. Engaging — a hook, question, or reaction that invites comments\n"
-            "3. Bold statement or call to action — confident and direct\n\n"
-            "Then suggest 3 real trending songs from Instagram's music library that match the "
-            "vibe, aesthetic, and energy of this content.\n\n"
+            "1. Vibe caption — sets the mood, aesthetic, sensory. 3–5 short lines + hashtags.\n"
+            "2. Hook caption — opens with POV:, a question, or a bold relatable statement. Invites comments. 4–7 lines + hashtags.\n"
+            "3. Story caption — shares a real feeling, moment, or mini story. Personal and genuine. 5–8 lines + hashtags.\n\n"
+            "IMPORTANT: Each caption MUST end with 5–7 hashtags on a new line. "
+            "Use real, current Instagram hashtags that match the content niche.\n\n"
+            "Then suggest 3 real trending songs currently on Instagram's music library that match the vibe.\n\n"
             "Format your response EXACTLY as:\n"
-            "CAPTION_1: [caption]\n"
-            "CAPTION_2: [caption]\n"
-            "CAPTION_3: [caption]\n"
+            "CAPTION_1: [full caption with line breaks and hashtags]\n"
+            "CAPTION_2: [full caption with line breaks and hashtags]\n"
+            "CAPTION_3: [full caption with line breaks and hashtags]\n"
             "MUSIC_1: [Artist] - [Song Title]\n"
             "MUSIC_2: [Artist] - [Song Title]\n"
             "MUSIC_3: [Artist] - [Song Title]\n\n"
-            "Keep each caption under 150 characters. No hashtags in caption body. "
-            "Only suggest real, well-known songs available on Instagram."
+            "Only suggest real, well-known songs available on Instagram Reels."
         )
     })
 
@@ -248,7 +263,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
 # --- Routes ---
 
 @app.post("/generate-captions")
-async def generate_captions_endpoint(files: list[UploadFile] = File(...)):
+async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto")):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
@@ -286,7 +301,7 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...)):
     log.info(f"Processing {len(files)} file(s), {len(all_frames)} image frame(s)")
 
     try:
-        result = generate_content(all_frames, last_media_type, num_source_files=len(files))
+        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone)
         log.info(f"Generated: {result}")
         return result
     except Exception as e:
