@@ -114,6 +114,75 @@ body::before {
 
 .hidden { display: none !important; }
 
+/* ── iOS install banner ── */
+.ios-install-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 420px;
+  background: rgba(255,250,252,0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(74,30,50,0.18);
+  z-index: 9999;
+  animation: slideUp 0.35s ease;
+}
+.ios-install-banner.hidden { display: none !important; }
+.ios-install-icon img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.ios-install-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ios-install-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--plum);
+}
+.ios-install-text span {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.ios-install-text svg {
+  display: inline;
+  vertical-align: middle;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.ios-install-text em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--accent);
+}
+.ios-install-close {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 /* ── Welcome screen ── */
 .welcome-wrap {
   flex: 1;

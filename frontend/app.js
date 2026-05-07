@@ -362,6 +362,22 @@ document.getElementById("btn-try-now").addEventListener("click", () => {
   enterApp(null);
 });
 
+// iOS install banner — show once on iOS Safari when not already installed as PWA
+(function () {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone;
+  const dismissed = sessionStorage.getItem("install-banner-dismissed");
+  if (!isIos || isStandalone || dismissed) return;
+
+  const banner = document.getElementById("ios-install-banner");
+  setTimeout(() => banner.classList.remove("hidden"), 2000);
+
+  document.getElementById("ios-install-close").addEventListener("click", () => {
+    banner.classList.add("hidden");
+    sessionStorage.setItem("install-banner-dismissed", "1");
+  });
+})();
+
 function enterApp(username) {
   document.getElementById("main-header").classList.remove("hidden");
   const pill = document.getElementById("user-pill");
