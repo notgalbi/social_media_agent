@@ -880,6 +880,23 @@ function renderCaptions(captions) {
   captionList.innerHTML = "";
   selectedWrap.classList.add("hidden");
 
+  // Preload image in preview immediately
+  const preview = document.getElementById("post-preview");
+  const mediaImg = document.getElementById("ig-media-img");
+  const badge = document.getElementById("ig-carousel-badge");
+  const capText = document.getElementById("ig-cap-text");
+  if (selectedFiles.length) {
+    mediaImg.src = URL.createObjectURL(selectedFiles[0]);
+    if (selectedFiles.length > 1) {
+      badge.textContent = `1 / ${selectedFiles.length}`;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  }
+  capText.textContent = "";
+  preview.classList.remove("hidden");
+
   captions.forEach((text, i) => {
     const card = document.createElement("div");
     card.className = "caption-card";
@@ -889,7 +906,6 @@ function renderCaptions(captions) {
     `;
     card.addEventListener("click", () => selectCaption(card, text));
     captionList.appendChild(card);
-    // staggered entrance
     setTimeout(() => card.classList.add("visible"), i * 120);
   });
 }
@@ -900,7 +916,7 @@ function selectCaption(card, text) {
   card.classList.add("selected");
   selectedCaption = text;
   captionEdit.value = text;
-  updatePostPreview(text);
+  document.getElementById("ig-cap-text").textContent = " " + text;
   selectedWrap.classList.remove("hidden");
   document.getElementById("post-preview").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -912,9 +928,7 @@ function updatePostPreview(text) {
   const badge = document.getElementById("ig-carousel-badge");
 
   if (selectedFiles.length) {
-    const firstFile = selectedFiles[0];
-    mediaImg.src = URL.createObjectURL(firstFile);
-
+    mediaImg.src = URL.createObjectURL(selectedFiles[0]);
     if (selectedFiles.length > 1) {
       badge.textContent = `1 / ${selectedFiles.length}`;
       badge.classList.remove("hidden");

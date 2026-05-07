@@ -78,23 +78,8 @@
 
     <!-- Captions Screen -->
     <section class="screen hidden" id="screen-captions">
-      <h2 class="section-title">Pick a Caption</h2>
-      <div class="caption-list" id="caption-list"></div>
 
-      <div class="music-wrap hidden" id="music-wrap">
-        <div class="music-header">
-          <span class="music-icon">♫</span>
-          <span class="music-title">Suggested Music for this Reel</span>
-        </div>
-        <div class="music-list" id="music-list"></div>
-        <p class="music-sub">Tap ▶ for a 30-second preview · Search in Instagram's music library when posting</p>
-        <div class="music-add-wrap">
-          <input type="text" class="music-custom-input" id="custom-song-input" placeholder="Add your own: Artist — Song name" />
-          <button class="btn-add-song" id="btn-add-song">+</button>
-        </div>
-      </div>
-
-      <!-- Post Preview -->
+      <!-- Post Preview — shown immediately with image preloaded -->
       <div class="post-preview hidden" id="post-preview">
         <div class="preview-label">Post Preview</div>
         <div class="ig-card">
@@ -147,6 +132,22 @@
             <span class="mtp-time" id="mtp-length-val">0:30</span>
           </div>
           <p class="mtp-hint">Instagram reels: up to 30 s · drag Start to pick your moment</p>
+        </div>
+      </div>
+
+      <h2 class="section-title">Pick a Caption</h2>
+      <div class="caption-list" id="caption-list"></div>
+
+      <div class="music-wrap hidden" id="music-wrap">
+        <div class="music-header">
+          <span class="music-icon">♫</span>
+          <span class="music-title">Suggested Music for this Reel</span>
+        </div>
+        <div class="music-list" id="music-list"></div>
+        <p class="music-sub">Tap ▶ for a 30-second preview · Search in Instagram's music library when posting</p>
+        <div class="music-add-wrap">
+          <input type="text" class="music-custom-input" id="custom-song-input" placeholder="Add your own: Artist — Song name" />
+          <button class="btn-add-song" id="btn-add-song">+</button>
         </div>
       </div>
 
