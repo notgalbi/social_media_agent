@@ -9,6 +9,27 @@ function getAudio() {
   return audioCtx;
 }
 
+// iOS Safari: AudioContext starts suspended and resume() is async, so oscillators
+// scheduled immediately after resume() may never fire. Unlock by playing a silent
+// 1-frame buffer on first touch — touchstart fires before click, so by the time
+// any button handler calls playSound() the context is already running.
+(function iosAudioUnlock() {
+  function unlock() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "running") return;
+    audioCtx.resume().then(() => {
+      const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    }).catch(() => {});
+  }
+  // Use capture=true so this runs before any button handlers
+  document.addEventListener("touchstart", unlock, { capture: true, passive: true, once: true });
+  document.addEventListener("click",      unlock, { capture: true, once: true });
+})();
+
 function playSound(type) {
   try {
     const ctx = getAudio();
