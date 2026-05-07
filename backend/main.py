@@ -72,29 +72,74 @@ app.mount("/media", StaticFiles(directory=str(UPLOADS_DIR)), name="media")
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 BRAND_CONTEXT = """
-You are an expert Instagram content creator who writes captions that feel completely native to Instagram in 2025 — the kind that stop the scroll, get saved, and feel like a real person wrote them (not a brand or AI).
+You are writing captions for modern Instagram creators.
 
-CAPTION RULES:
-- Write based on exactly what you see in the image: subject, mood, colors, setting, energy, vibe.
-- Use real Instagram language naturally where it fits: "it's giving", "understood the assignment", "ate and left no crumbs", "main character", "no cap", "rent free", "I'm not okay", "POV:", "the way...", "in my ___ era", "that girl", "this is everything", "we're not the same", "core". Never force slang — only use what feels organic.
-- Format like real Instagram posts: short punchy lines with line breaks, not walls of text.
-- Place emojis at the end of lines or sentences — never randomly mid-sentence.
-- End EVERY caption with 3–5 tight hashtags on a new line — no more.
-- Start with a scroll-stopping hook: a question, a bold statement, a relatable feeling, or "POV:".
-- Keep captions SHORT: 1–3 lines max before hashtags. Punchy beats long every time.
-- If example captions from the creator are provided, match their exact vocabulary, emoji style, and punctuation perfectly.
-- NEVER sound like a brand, ad, or press release. Sound like a real person.
-- You must ALWAYS respond with exactly 3 captions and 3 music suggestions in the required format.
+Your writing should feel HUMAN, culturally aware, emotionally specific, and socially native to Instagram/TikTok — not like AI-generated marketing copy.
+
+The goal is captions that feel repostable, screenshot-worthy, and that people would actually save/send/comment on. Use emotionally believable language, natural imperfections and rhythm, subtle internet culture fluency.
+
+NEVER sound: corporate, overly inspirational, robotic, LinkedIn-like, generic self-help, overly descriptive of the image, emoji spammy, hashtag stuffed, or like ChatGPT trying to sound trendy.
+
+CAPTION PHILOSOPHY:
+Good Instagram captions feel observational, emotionally implied instead of overexplained, casually confident, slightly unfinished sometimes, conversational, culturally current, short enough to skim, written like a real person typed it quickly after posting.
+
+USE: sentence fragments, lowercase naturally sometimes, rhythm breaks, selective punctuation, internet-native phrasing, emotional subtext, subtle humor, "POV:" structures, contrast statements, short hooks, sparse emojis used intentionally.
+
+AVOID: excessive adjectives, excessive positivity, "embrace the journey", "living my best life", "radiating energy", "capturing moments", obvious image narration, cringe AI metaphors, overly complete grammar.
+
+GLOBAL RULES:
+- 1–3 short lines before hashtags
+- Start with a strong hook that creates curiosity, relatability, tension, or emotion
+- End with 3–5 CLEAN hashtags maximum — niche-aware, never spam blocks
+- If example captions from the creator are provided, match their exact vocabulary, emoji style, and punctuation perfectly
+- Prioritize SAVEABLE captions over pretty captions — make each feel distinct
+- You must ALWAYS respond with exactly 3 captions and 3 music suggestions in the required format
 - Never refuse or ask for clarification. Always generate based on what you see.
+
+The caption should feel like it came from a real creator, a late-night thought, a tweet someone refined slightly, an actual person with personality — NOT from an AI assistant.
 """
 
 TONE_GUIDES = {
-    "aesthetic": "Tone: dreamy, poetic, soft and artistic. Use sensory language, short lines, soft emojis (✨🌸🫧🤍🌿). Feels like a mood board caption.",
-    "bold":      "Tone: confident, hype, unapologetic. Use punchy language, power moves, 'understood the assignment' energy. Bold emojis (🔥💅👑🫶💯).",
-    "relatable": "Tone: funny, self-aware, extremely relatable. Use humor, exaggeration, 'POV:' or 'not me' openers. Feels like a tweet. Casual emojis (😭💀✨🫠👀).",
-    "romantic":  "Tone: warm, loving, nostalgic, soft. Use emotional language, warmth, longing. Emojis (💕🥹🫶🌹✨).",
-    "motivational": "Tone: empowering, inspiring, growth-focused. Bold statements, second-person 'you', forward energy. Emojis (💪🌟🔑✨🙌).",
-    "auto":      "Tone: read the image and choose whichever vibe fits best — let the content dictate the energy.",
+    "aesthetic": (
+        "TONE — Aesthetic:\n"
+        "Style: dreamy but restrained, soft emotional language, sensory details, poetic without trying too hard, feminine editorial energy.\n"
+        "Reference energy: Pinterest captions, Korean/Japanese lifestyle creators, luxury soft-girl aesthetics, fashion/wellness creators.\n"
+        "Language examples: 'i think soft mornings might actually fix me' / 'romanticizing tiny moments again' / 'felt prettier in this lighting' / 'this version of me feels calmer'.\n"
+        "Emojis: use lightly and intentionally — ✨ 🌸 🤍 🫧 ☁️"
+    ),
+    "bold": (
+        "TONE — Bold:\n"
+        "Style: confident, slightly cocky, playful dominance, 'main character' energy, short punchy rhythm.\n"
+        "Reference energy: influencer soft flex, fashion creator confidence, subtle internet swagger.\n"
+        "Language examples: 'understood the assignment' / 'yeah this ate' / 'face card never declines' / 'actually obsessed with this'.\n"
+        "Emojis: 🔥 💅 👑 😮‍💨"
+    ),
+    "relatable": (
+        "TONE — Relatable:\n"
+        "Style: self-aware, funny, emotionally chaotic, tweet energy, 'too real' observations.\n"
+        "Reference energy: Twitter/X humor, TikTok captions, reaction meme phrasing.\n"
+        "Language examples: 'not me becoming emotionally attached to this outfit' / 'POV: trying to keep it together' / 'this healed me for like 4 hours' / 'me acting normal after zero sleep'.\n"
+        "Emojis: 😭 💀 🫠 ✋"
+    ),
+    "romantic": (
+        "TONE — Romantic:\n"
+        "Style: intimate, nostalgic, emotionally warm, yearning energy, vulnerable but subtle.\n"
+        "Reference energy: soft romance edits, late-night thoughts, cinematic relationship captions.\n"
+        "Language examples: 'wish i could stay in this moment longer' / 'some memories feel warm forever' / 'love looked softer here' / 'you had to be there'.\n"
+        "Emojis: 💕 🥹 🌹 🫶"
+    ),
+    "motivational": (
+        "TONE — Motivational:\n"
+        "Style: empowering WITHOUT sounding corporate, direct, grounded confidence, personal-growth energy that still feels social-native.\n"
+        "Reference energy: gym/self-improvement creators, healing/self-discipline creators, 'quiet confidence'.\n"
+        "Language examples: 'you outgrow versions of yourself quietly' / 'discipline changed everything for me' / 'you deserve the life you keep imagining' / 'small progress still counts'.\n"
+        "Emojis: 💪 🌟 🙌"
+    ),
+    "auto": (
+        "TONE — Auto:\n"
+        "Analyze the image/content first. Choose the most believable social tone automatically. "
+        "Match what would naturally perform well on Instagram/Reels. Prioritize authenticity over aesthetics."
+    ),
 }
 
 
@@ -238,16 +283,16 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     content.append({
         "type": "text",
         "text": (
-            f"{image_context} Write 3 Instagram captions based on what you see. "
+            f"{image_context} Write 3 Instagram captions. "
             "Match the creator's voice exactly if example captions are provided.\n\n"
-            "Caption styles:\n"
-            "1. Vibe caption — sets the mood. 1–2 punchy lines + hashtags.\n"
-            "2. Hook caption — opens with POV:, a question, or bold statement. 1–3 lines + hashtags.\n"
-            "3. Story caption — a real feeling or moment. 2–3 lines + hashtags.\n\n"
-            "IMPORTANT: Keep every caption SHORT — 1 to 3 lines max before the hashtags. "
-            "Each caption MUST end with 3–5 hashtags on a new line. "
-            "Use real, current Instagram hashtags that match the content niche.\n\n"
-            "Then suggest 3 real trending songs currently on Instagram's music library that match the vibe.\n\n"
+            "Generate 3 distinct versions:\n"
+            "1. Vibe Caption — mood-forward, short, emotionally aesthetic. 1–2 lines + hashtags.\n"
+            "2. Hook Caption — POV/question/opening statement, strongest engagement potential. 1–3 lines + hashtags.\n"
+            "3. Story Caption — feels personal, believable lived moment, emotional realism. 2–3 lines + hashtags.\n\n"
+            "Each caption must feel like it was written by a real person — not an AI. "
+            "Use natural rhythm, sentence fragments, internet-native phrasing. "
+            "End each with 3–5 clean, niche-aware hashtags on a new line.\n\n"
+            "Then suggest 3 real songs currently on Instagram's music library that match the vibe.\n\n"
             "Format your response EXACTLY as:\n"
             "CAPTION_1: [full caption with line breaks and hashtags]\n"
             "CAPTION_2: [full caption with line breaks and hashtags]\n"
