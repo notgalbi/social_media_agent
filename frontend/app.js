@@ -581,13 +581,15 @@ async function prefetchMusicUrls(tracks) {
   for (const t of tracks) {
     const key = `${t.artist} - ${t.song}`;
     if (musicUrlCache[key] !== undefined) continue;
-    musicUrlCache[key] = null; // mark in-progress to avoid duplicate fetches
+    musicUrlCache[key] = "loading"; // sentinel: fetch in progress
     try {
       const q = encodeURIComponent(`${t.artist} ${t.song}`);
       const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
       const data = await res.json();
       musicUrlCache[key] = data.results?.[0]?.previewUrl || null;
-    } catch {}
+    } catch {
+      musicUrlCache[key] = null; // fetch failed
+    }
   }
 }
 
@@ -664,14 +666,31 @@ function handlePreview(btn, artist, song) {
   currentPreviewBtn = null;
 
   const key = `${artist} - ${song}`;
-  const url = musicUrlCache[key];
+  const cached = musicUrlCache[key];
 
-  if (!url) {
+  if (cached === undefined || cached === "loading") {
+    // Still fetching — show loading and auto-play when ready
     btn.textContent = "…";
-    setTimeout(() => { if (btn.textContent === "…") btn.textContent = "▶"; }, 1500);
+    currentPreviewBtn = btn;
+    const poll = setInterval(() => {
+      const v = musicUrlCache[key];
+      if (v === undefined || v === "loading") return;
+      clearInterval(poll);
+      if (currentPreviewBtn !== btn) return; // user moved on
+      if (!v) { btn.textContent = "▶"; currentPreviewBtn = null; return; }
+      btn.textContent = "▶";
+      handlePreview(btn, artist, song); // retry now that URL is ready
+    }, 150);
     return;
   }
 
+  if (!cached) {
+    btn.textContent = "—";
+    setTimeout(() => btn.textContent = "▶", 2000);
+    return;
+  }
+
+  const url = cached;
   // Reuse pre-unlocked cardAudio — iOS allows play() on elements unlocked in prior gesture
   currentPreviewBtn = btn;
   cardAudio.src = url;
@@ -730,12 +749,12 @@ function addMusicToPreview(cardEl, artist, song) {
   // Use cached URL (pre-fetched when music rendered) — no await needed
   previewMusicTrack = { artist, song };
   const key = `${artist} - ${song}`;
-  previewMusicUrl = musicUrlCache[key] || null;
+  const cached = musicUrlCache[key];
+  previewMusicUrl = (cached && cached !== "loading") ? cached : null;
 
   if (previewMusicUrl) {
     updateMtpPlayBtn("stopped");
-  } else if (musicUrlCache[key] === undefined) {
-    // Not in cache yet — fetch it now and update button when ready
+  } else if (!cached || cached === "loading") {
     updateMtpPlayBtn("loading");
     prefetchMusicUrls([{ artist, song }]).then(() => {
       previewMusicUrl = musicUrlCache[key] || null;
