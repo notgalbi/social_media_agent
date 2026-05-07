@@ -102,92 +102,114 @@ TONE_GUIDES = {
     "aesthetic": (
         "TONE — Aesthetic:\n"
         "Style: dreamy but restrained, soft emotional language, sensory details, poetic without trying too hard, feminine editorial energy.\n"
-        "Reference energy: Pinterest captions, Korean/Japanese lifestyle creators, luxury soft-girl aesthetics, fashion/wellness creators.\n"
-        "Language examples: 'i think soft mornings might actually fix me' / 'romanticizing tiny moments again' / 'felt prettier in this lighting' / 'this version of me feels calmer'.\n"
+        "Gen Z language patterns: 'in my soft era' / 'romanticizing my life again' / 'it's giving cottagecore' / 'delulu but make it soft' / 'this is so that girl'\n"
+        "Reference energy: Pinterest captions, Korean/Japanese lifestyle creators, that girl aesthetic, soft-life TikTok.\n"
+        "Language examples: 'i think soft mornings might actually fix me' / 'romanticizing tiny moments again' / 'felt prettier in this lighting' / 'this version of me feels calmer' / 'in my healing era and it shows'.\n"
         "Emojis: use lightly and intentionally — ✨ 🌸 🤍 🫧 ☁️"
     ),
     "bold": (
         "TONE — Bold:\n"
-        "Style: confident, slightly cocky, playful dominance, 'main character' energy, short punchy rhythm.\n"
-        "Reference energy: influencer soft flex, fashion creator confidence, subtle internet swagger.\n"
-        "Language examples: 'understood the assignment' / 'yeah this ate' / 'face card never declines' / 'actually obsessed with this'.\n"
+        "Style: confident, slightly cocky, playful dominance, main character energy, short punchy rhythm.\n"
+        "Gen Z language patterns: 'understood the assignment' / 'ate and left no crumbs' / 'face card never declines' / 'it's giving' / 'slay' / 'no notes' / 'rent free' / 'caught in 4K serving'\n"
+        "Reference energy: influencer soft flex, fashion creator confidence, rizz energy, subtle internet swagger.\n"
+        "Language examples: 'understood the assignment and submitted early' / 'face card expired? never heard of her' / 'yeah this ate. no crumbs.' / 'the confidence was unmatched' / 'it's giving everything it's supposed to give'.\n"
         "Emojis: 🔥 💅 👑 😮‍💨"
     ),
     "relatable": (
         "TONE — Relatable:\n"
-        "Style: self-aware, funny, emotionally chaotic, tweet energy, 'too real' observations.\n"
-        "Reference energy: Twitter/X humor, TikTok captions, reaction meme phrasing.\n"
-        "Language examples: 'not me becoming emotionally attached to this outfit' / 'POV: trying to keep it together' / 'this healed me for like 4 hours' / 'me acting normal after zero sleep'.\n"
+        "Style: self-aware, funny, emotionally chaotic, tweet energy, too real observations, ironic sincerity.\n"
+        "Gen Z language patterns: 'not me...' / 'POV:' / 'caught in 4K' / 'no because why' / 'i'm in my flop era' / 'the delusion is real' / 'this is so core' / 'lowkey / highkey' / 'slay i guess'\n"
+        "Reference energy: FinTok chaos, relatable TikTok, therapy speak ironically, unwell behavior.\n"
+        "Language examples: 'not me becoming emotionally attached to this' / 'POV: you're down bad' / 'this healed me for like 4 hours' / 'no because why does this go so hard' / 'the audacity. the nerve. the gall.' / 'i'm in my villain era apparently'.\n"
         "Emojis: 😭 💀 🫠 ✋"
     ),
     "romantic": (
         "TONE — Romantic:\n"
-        "Style: intimate, nostalgic, emotionally warm, yearning energy, vulnerable but subtle.\n"
-        "Reference energy: soft romance edits, late-night thoughts, cinematic relationship captions.\n"
-        "Language examples: 'wish i could stay in this moment longer' / 'some memories feel warm forever' / 'love looked softer here' / 'you had to be there'.\n"
+        "Style: intimate, nostalgic, emotionally warm, yearning energy, vulnerable but subtle. Ironic sincerity welcome.\n"
+        "Gen Z language patterns: 'down bad' / 'in my lover era' / 'the way i...' / 'rent free' / 'soft launching' / 'this person lives in my head'\n"
+        "Reference energy: soft romance edits, late-night thoughts, sapphic aesthetic, cinematic relationship captions.\n"
+        "Language examples: 'wish i could stay in this moment longer' / 'some memories feel warm forever' / 'love looked softer here' / 'you had to be there' / 'the way this lives rent free' / 'down bad and at peace with it'.\n"
         "Emojis: 💕 🥹 🌹 🫶"
     ),
     "motivational": (
         "TONE — Motivational:\n"
-        "Style: empowering WITHOUT sounding corporate, direct, grounded confidence, personal-growth energy that still feels social-native.\n"
-        "Reference energy: gym/self-improvement creators, healing/self-discipline creators, 'quiet confidence'.\n"
-        "Language examples: 'you outgrow versions of yourself quietly' / 'discipline changed everything for me' / 'you deserve the life you keep imagining' / 'small progress still counts'.\n"
+        "Style: empowering WITHOUT sounding corporate or LinkedIn. Grounded, direct, feels earned not performed.\n"
+        "Gen Z language patterns: 'we're not the same' / 'that girl era' / 'main character behavior' / 'doing it for the plot' / 'the glow up is real' / 'leveling up quietly'\n"
+        "Reference energy: gym TikTok, that girl routines, self-discipline creators, quiet confidence aesthetic.\n"
+        "Language examples: 'you outgrow versions of yourself quietly' / 'discipline changed everything for me' / 'the glow up was an inside job' / 'doing it for the plot at this point' / 'we're not the same and that's the point' / 'leveled up and didn't announce it'.\n"
         "Emojis: 💪 🌟 🙌"
     ),
     "wanderlust": (
         "TONE — Wanderlust:\n"
-        "Style: adventurous, free-spirited, slightly poetic. Feels like a travel diary entry, not a tourism ad.\n"
-        "Reference energy: solo travel creators, adventure photographers, van life, backpacking blogs.\n"
-        "Language examples: 'still thinking about this view' / 'some places just stay with you' / 'packed a bag and figured the rest out later' / 'new city, same chaos'.\n"
+        "Style: adventurous, free-spirited, slightly poetic. Travel diary energy, not tourism ad energy.\n"
+        "Gen Z language patterns: 'it's giving abroad era' / 'doing it for the plot' / 'main character travel' / 'no thoughts just [location]' / 'this ate differently in [city]'\n"
+        "Reference energy: solo travel TikTok, van life creators, backpacking vlogs, travel that girl.\n"
+        "Language examples: 'still thinking about this view' / 'some places just stay with you' / 'packed a bag and figured the rest out later' / 'new city, same chaos' / 'no thoughts just this sunset' / 'doing it for the plot and the passport stamps'.\n"
         "Emojis: 🌍 ✈️ 🗺️ 🌅"
     ),
     "funny": (
         "TONE — Funny:\n"
-        "Style: pure comedy, meme-brained, absurdist observations, zero pretension. Punchy delivery.\n"
-        "Reference energy: Twitter/X comedians, meme pages, comedy creators, chaotic-good energy.\n"
-        "Language examples: 'this photo is doing a lot of heavy lifting' / 'the audacity of me' / 'criminally unhinged behavior' / 'i am not well and this is proof'.\n"
-        "Emojis: 😂 💀 🤣 😭 (use sparingly for punchline emphasis)"
+        "Style: pure comedy, meme-brained, absurdist, chaotic-good energy. Delivery matters — punchy last line.\n"
+        "Gen Z language patterns: 'i am so normal about this' / 'we move' / 'it's giving unwell' / 'the way i...' / 'criminally [adjective]' / 'this slaps actually' / 'no thoughts head empty'\n"
+        "Reference energy: Twitter/X brain rot, TikTok chaos energy, meme format captions, self-aware cringe.\n"
+        "Language examples: 'this photo is doing a lot of heavy lifting' / 'criminally unhinged behavior and i stand by it' / 'i am so normal about all of this' / 'no thoughts. head empty. just vibes.' / 'the delusion that carried me here'.\n"
+        "Emojis: 😂 💀 🫠 (punchline placement only)"
     ),
     "earthy": (
         "TONE — Earthy:\n"
-        "Style: grounded, slow, sensory, nature-connected. Feels like a journal entry written outside.\n"
-        "Reference energy: cottagecore, sustainability creators, foraging, slow living, outdoor wellness.\n"
-        "Language examples: 'this is the reset i didn't know i needed' / 'good things grow slowly' / 'back to basics' / 'the earth actually fixes you'.\n"
+        "Style: grounded, slow, sensory, nature-connected. Journal entry written outside, not wellness brand copy.\n"
+        "Gen Z language patterns: 'in my cottage era' / 'this reset me actually' / 'slow living agenda' / 'feral but in a healing way' / 'it's giving forest'\n"
+        "Reference energy: cottagecore TikTok, sustainability creators, slow living, foraging, outdoor wellness.\n"
+        "Language examples: 'this is the reset i didn't know i needed' / 'good things grow slowly and so do i' / 'back to basics back to myself' / 'the earth actually fixes you' / 'in my feral forest era' / 'it's giving slow morning and i need more of this'.\n"
         "Emojis: 🌿 🍃 🌱 ☁️ (light and intentional)"
     ),
     "hustle": (
         "TONE — Hustle:\n"
-        "Style: driven, direct, no-fluff ambition. Feels earned, not performative. Grounded confidence.\n"
-        "Reference energy: entrepreneur creators, gym/discipline content, business builders, self-made energy.\n"
-        "Language examples: 'the work is the way' / 'nobody claps at the beginning' / 'building something real' / 'quiet work, loud results'.\n"
-        "Emojis: 💼 🔑 📈 💪 (used to punctuate, not decorate)"
+        "Style: driven, direct, no-fluff. Feels earned not performed. Quiet confidence over loud grind.\n"
+        "Gen Z language patterns: 'we're not the same' / 'the bag secured itself' / 'main character behavior' / 'doing it for the plot' / 'no cap' / 'different breed'\n"
+        "Reference energy: entrepreneur TikTok, gym discipline creators, self-made energy, business that girl.\n"
+        "Language examples: 'the work is the way' / 'nobody claps at the beginning. that's fine.' / 'building something real, no cap' / 'quiet work loud results we're not the same' / 'the bag secured itself actually' / 'different breed behavior'.\n"
+        "Emojis: 💼 🔑 📈 💪 (punctuate, don't decorate)"
     ),
     "moody": (
         "TONE — Moody:\n"
-        "Style: dark, cinematic, introspective. Minimal words. Maximum atmosphere.\n"
-        "Reference energy: film photography creators, dark aesthetic pages, editorial fashion, alt/indie vibes.\n"
-        "Language examples: 'some feelings don't have names' / 'existing dramatically' / 'the light did something' / 'not okay but make it fashion'.\n"
-        "Emojis: 🌙 🖤 🫥 (rare — used for punctuation only)"
+        "Style: dark, cinematic, introspective, minimal. Maximum atmosphere per word. Brooding but not dramatic.\n"
+        "Gen Z language patterns: 'it's giving dark academia' / 'in my villain era' / 'the vibe is unmatched' / 'lowkey unwell about this' / 'no thoughts just the aesthetic'\n"
+        "Reference energy: dark academia, film photography TikTok, alt/indie creators, editorial fashion.\n"
+        "Language examples: 'some feelings don't have names' / 'existing dramatically as always' / 'the light did something and i let it' / 'in my villain era and the aesthetic is immaculate' / 'lowkey unwell about this photo honestly'.\n"
+        "Emojis: 🌙 🖤 🫥 (rare — punctuation only)"
     ),
     "foodie": (
         "TONE — Foodie:\n"
-        "Style: sensory, indulgent, specific. Make the reader taste it. Avoid generic food praise.\n"
-        "Reference energy: restaurant reviewers, food photographers, home cooks, culinary creators.\n"
-        "Language examples: 'criminally good' / 'this changed my life a little bit' / 'the crust alone deserves a moment' / 'ate this in complete silence out of respect'.\n"
-        "Emojis: 🍽️ 🧄 🫶 ✨ (only where they add flavor)"
+        "Style: sensory, indulgent, specific. Make the reader taste it. Avoid generic food praise entirely.\n"
+        "Gen Z language patterns: 'this ate' / 'criminally good' / 'no crumbs left' / 'it's giving michelin' / 'the way this slaps' / 'ate this in silence out of respect'\n"
+        "Reference energy: FoodTok, restaurant reviewers, home cook creators, culinary content.\n"
+        "Language examples: 'criminally good. no notes.' / 'this changed my life a little bit' / 'ate this in complete silence out of respect' / 'it's giving michelin star and i'm not okay' / 'the way this slapped differently today' / 'no crumbs were left. none.'.\n"
+        "Emojis: 🍽️ 🧄 🫶 ✨ (flavor only)"
     ),
     "auto": (
         "TONE — Auto:\n"
         "Analyze the image/content first. Choose the most believable social tone automatically. "
-        "Match what would naturally perform well on Instagram/Reels. Prioritize authenticity over aesthetics."
+        "Match what would naturally perform well on Instagram/Reels. Use Gen Z-native language where it fits organically. Prioritize authenticity over aesthetics."
     ),
 }
 
-LENGTH_GUIDES = {
-    "short":  "LENGTH: Ultra-concise. 1–2 lines max before hashtags. Every word earns its place. Cut everything that doesn't hit.",
-    "medium": "LENGTH: 2–4 lines before hashtags. Room for a hook and one real thought. Don't overstay.",
-    "long":   "LENGTH: 4–7 lines before hashtags. Space for a real story, a moment, vulnerability, or layered observation. Still tight — no filler lines.",
-}
+
+def get_length_guide(level: int) -> str:
+    guides = {
+        1: "LENGTH: Exactly 1 line before hashtags. One perfect, punchy thought. Cut everything else.",
+        2: "LENGTH: 1–2 lines before hashtags. Every word earns its place. Tight.",
+        3: "LENGTH: 3–4 lines before hashtags. Room for a hook and one real thought.",
+        4: "LENGTH: 5–6 lines before hashtags. Space for emotion, context, and depth.",
+        5: "LENGTH: 7–10 lines before hashtags. Full narrative — a real moment, vulnerability, or layered story. No filler lines.",
+    }
+    return guides.get(level, guides[2])
+
+
+def get_hashtag_guide(count: int) -> str:
+    if count == 0:
+        return "HASHTAGS: Do not include any hashtags. End the caption without them."
+    return f"HASHTAGS: End with exactly {count} relevant, niche-aware hashtag{'s' if count > 1 else ''} on a new line. No more, no less."
 
 
 # --- Store helpers ---
@@ -310,12 +332,13 @@ def parse_music(raw: str) -> list[dict]:
     return music[:3]
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length: str = "short") -> dict:
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length_level: int = 2, hashtag_count: int = 5) -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
     tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["auto"])
-    length_guide = LENGTH_GUIDES.get(length, LENGTH_GUIDES["short"])
-    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}" + style_block
+    length_guide = get_length_guide(length_level)
+    hashtag_guide = get_hashtag_guide(hashtag_count)
+    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}" + style_block
 
     content = []
     for img_b64 in image_b64_list:
@@ -399,7 +422,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
 # --- Routes ---
 
 @app.post("/generate-captions")
-async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto"), length: str = Form("short")):
+async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto"), length_level: int = Form(2), hashtag_count: int = Form(5)):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
@@ -435,24 +458,12 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: 
         raise HTTPException(status_code=400, detail="No supported files found")
 
     start_time = time.perf_counter()
-    start_log = {
-        "event": "generate_captions_start",
-        "num_files": len(files),
-        "num_frames": len(all_frames),
-        "tone": tone
-    }
-    log.info(json.dumps(start_log))
+    log.info(f"Processing {len(files)} file(s), {len(all_frames)} frame(s), tone={tone} length={length_level} hashtags={hashtag_count}")
 
     try:
-        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone)
+        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone, length_level=length_level, hashtag_count=hashtag_count)
         duration = time.perf_counter() - start_time
-        success_log = {
-            "event": "generate_captions_success",
-            "duration_s": round(duration, 3),
-            "num_captions": len(result.get("captions", [])),
-            "num_music": len(result.get("music", []))
-        }
-        log.info(json.dumps(success_log))
+        log.info(json.dumps({"event": "generate_captions_success", "duration_s": round(duration, 3), "num_captions": len(result.get("captions", []))}))
         return result
     except Exception as e:
         duration = time.perf_counter() - start_time
