@@ -583,18 +583,24 @@ let previewMusicUrl = null;
 let selectedMusicCardEl = null;
 const musicUrlCache = {}; // keyed by "Artist - Song"
 
+async function itunesPreviewUrl(term) {
+  const q = encodeURIComponent(term);
+  const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=5`);
+  const data = await res.json();
+  return data.results?.find(r => r.previewUrl)?.previewUrl || null;
+}
+
 async function prefetchMusicUrls(tracks) {
   for (const t of tracks) {
     const key = `${t.artist} - ${t.song}`;
     if (musicUrlCache[key] !== undefined) continue;
-    musicUrlCache[key] = "loading"; // sentinel: fetch in progress
+    musicUrlCache[key] = "loading";
     try {
-      const q = encodeURIComponent(`${t.artist} ${t.song}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
-      const data = await res.json();
-      musicUrlCache[key] = data.results?.[0]?.previewUrl || null;
+      // Try "Artist Song" first, then fall back to song title alone
+      const url = (await itunesPreviewUrl(`${t.artist} ${t.song}`)) || (await itunesPreviewUrl(t.song));
+      musicUrlCache[key] = url;
     } catch {
-      musicUrlCache[key] = null; // fetch failed
+      musicUrlCache[key] = null;
     }
   }
 }
