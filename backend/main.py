@@ -10,6 +10,9 @@ from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 import httpx
 import anthropic
 import cv2
@@ -27,6 +30,17 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 log = logging.getLogger(__name__)
+
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+        profiles_sample_rate=0.5,
+        send_default_pii=False,
+    )
+    log.info("Sentry initialized")
 
 STORE_PATH = Path(__file__).parent / "captions_store.json"
 UPLOADS_DIR = Path(__file__).parent / "uploads"
@@ -252,7 +266,17 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     )
 
     raw = message.content[0].text
-    log.info(f"Raw Claude response:\n{raw}")
+    usage = message.usage
+    input_tokens  = usage.input_tokens
+    output_tokens = usage.output_tokens
+    # Haiku pricing: $0.80/M input, $4.00/M output
+    cost_usd = (input_tokens * 0.0000008) + (output_tokens * 0.000004)
+
+    log.info(f"Tokens — in:{input_tokens} out:{output_tokens} cost:${cost_usd:.5f}")
+    TOKEN_STATS["total_input"]  += input_tokens
+    TOKEN_STATS["total_output"] += output_tokens
+    TOKEN_STATS["total_cost"]   += cost_usd
+    TOKEN_STATS["total_calls"]  += 1
 
     return {
         "captions": parse_captions(raw),
@@ -298,7 +322,7 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: 
     if not all_frames:
         raise HTTPException(status_code=400, detail="No supported files found")
 
-    log.info(f"Processing {len(files)} file(s), {len(all_frames)} image frame(s)")
+    log.info(f"Processing {len(files)} file(s), {len(all_frames)} frame(s), tone={tone}")
 
     try:
         result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone)
@@ -621,6 +645,12 @@ async def _fetch_ig_captions_from_buffer(token: str, profile_id: str) -> list[st
 
 # Logs endpoint so you can see what's happening
 LOG_ENTRIES: list[dict] = []
+TOKEN_STATS: dict = {
+    "total_calls": 0,
+    "total_input": 0,
+    "total_output": 0,
+    "total_cost": 0.0,
+}
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -643,7 +673,13 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/logs")
 def get_logs():
-    return {"logs": list(reversed(LOG_ENTRIES))}
+    return {
+        "logs": list(reversed(LOG_ENTRIES)),
+        "tokens": {
+            **TOKEN_STATS,
+            "total_cost_display": f"${TOKEN_STATS['total_cost']:.4f}",
+        },
+    }
 
 
 @app.get("/health")
