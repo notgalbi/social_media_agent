@@ -728,6 +728,20 @@ def get_logs():
     }
 
 
+@app.get("/music-preview")
+async def music_preview(artist: str = "", song: str = ""):
+    """Proxy iTunes search so iOS doesn't block cross-origin requests to apple.com."""
+    async with httpx.AsyncClient(timeout=8) as c:
+        async def search(term: str):
+            r = await c.get("https://itunes.apple.com/search", params={"term": term, "media": "music", "limit": 5})
+            results = r.json().get("results", [])
+            hit = next((x for x in results if x.get("previewUrl")), None)
+            return hit.get("previewUrl") if hit else None
+
+        url = await search(f"{artist} {song}") or await search(song)
+        return {"previewUrl": url}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}

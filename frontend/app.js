@@ -583,32 +583,20 @@ let previewMusicUrl = null;
 let selectedMusicCardEl = null;
 const musicUrlCache = {}; // keyed by "Artist - Song"
 
-async function itunesSearch(term) {
-  const q = encodeURIComponent(term);
-  const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=5`);
-  return res.json();
-}
-
 async function prefetchMusicUrls(tracks) {
   for (const t of tracks) {
     const key = `${t.artist} - ${t.song}`;
     if (musicUrlCache[key] !== undefined) continue;
     musicUrlCache[key] = "loading";
     try {
-      const d1 = await itunesSearch(`${t.artist} ${t.song}`);
-      let hit = d1.results?.find(r => r.previewUrl);
-      if (!hit) {
-        const d2 = await itunesSearch(t.song);
-        hit = d2.results?.find(r => r.previewUrl);
-        if (!hit) {
-          const first = d1.results?.[0];
-          _debugToast(`No preview: "${t.song}" — iTunes returned ${d1.resultCount} result(s), first: "${first?.trackName || "none"}"`);
-        }
-      }
-      musicUrlCache[key] = hit?.previewUrl || null;
+      const params = new URLSearchParams({ artist: t.artist, song: t.song });
+      const res = await fetch(`${API_URL}/music-preview?${params}`);
+      const data = await res.json();
+      musicUrlCache[key] = data.previewUrl || null;
+      if (!data.previewUrl) _debugToast(`No preview found: "${t.artist} - ${t.song}"`);
     } catch(e) {
       musicUrlCache[key] = null;
-      _debugToast(`iTunes fetch error: ${e?.message}`);
+      _debugToast(`Music fetch error: ${e?.message}`);
     }
   }
 }
