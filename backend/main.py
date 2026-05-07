@@ -134,11 +134,59 @@ TONE_GUIDES = {
         "Language examples: 'you outgrow versions of yourself quietly' / 'discipline changed everything for me' / 'you deserve the life you keep imagining' / 'small progress still counts'.\n"
         "Emojis: 💪 🌟 🙌"
     ),
+    "wanderlust": (
+        "TONE — Wanderlust:\n"
+        "Style: adventurous, free-spirited, slightly poetic. Feels like a travel diary entry, not a tourism ad.\n"
+        "Reference energy: solo travel creators, adventure photographers, van life, backpacking blogs.\n"
+        "Language examples: 'still thinking about this view' / 'some places just stay with you' / 'packed a bag and figured the rest out later' / 'new city, same chaos'.\n"
+        "Emojis: 🌍 ✈️ 🗺️ 🌅"
+    ),
+    "funny": (
+        "TONE — Funny:\n"
+        "Style: pure comedy, meme-brained, absurdist observations, zero pretension. Punchy delivery.\n"
+        "Reference energy: Twitter/X comedians, meme pages, comedy creators, chaotic-good energy.\n"
+        "Language examples: 'this photo is doing a lot of heavy lifting' / 'the audacity of me' / 'criminally unhinged behavior' / 'i am not well and this is proof'.\n"
+        "Emojis: 😂 💀 🤣 😭 (use sparingly for punchline emphasis)"
+    ),
+    "earthy": (
+        "TONE — Earthy:\n"
+        "Style: grounded, slow, sensory, nature-connected. Feels like a journal entry written outside.\n"
+        "Reference energy: cottagecore, sustainability creators, foraging, slow living, outdoor wellness.\n"
+        "Language examples: 'this is the reset i didn't know i needed' / 'good things grow slowly' / 'back to basics' / 'the earth actually fixes you'.\n"
+        "Emojis: 🌿 🍃 🌱 ☁️ (light and intentional)"
+    ),
+    "hustle": (
+        "TONE — Hustle:\n"
+        "Style: driven, direct, no-fluff ambition. Feels earned, not performative. Grounded confidence.\n"
+        "Reference energy: entrepreneur creators, gym/discipline content, business builders, self-made energy.\n"
+        "Language examples: 'the work is the way' / 'nobody claps at the beginning' / 'building something real' / 'quiet work, loud results'.\n"
+        "Emojis: 💼 🔑 📈 💪 (used to punctuate, not decorate)"
+    ),
+    "moody": (
+        "TONE — Moody:\n"
+        "Style: dark, cinematic, introspective. Minimal words. Maximum atmosphere.\n"
+        "Reference energy: film photography creators, dark aesthetic pages, editorial fashion, alt/indie vibes.\n"
+        "Language examples: 'some feelings don't have names' / 'existing dramatically' / 'the light did something' / 'not okay but make it fashion'.\n"
+        "Emojis: 🌙 🖤 🫥 (rare — used for punctuation only)"
+    ),
+    "foodie": (
+        "TONE — Foodie:\n"
+        "Style: sensory, indulgent, specific. Make the reader taste it. Avoid generic food praise.\n"
+        "Reference energy: restaurant reviewers, food photographers, home cooks, culinary creators.\n"
+        "Language examples: 'criminally good' / 'this changed my life a little bit' / 'the crust alone deserves a moment' / 'ate this in complete silence out of respect'.\n"
+        "Emojis: 🍽️ 🧄 🫶 ✨ (only where they add flavor)"
+    ),
     "auto": (
         "TONE — Auto:\n"
         "Analyze the image/content first. Choose the most believable social tone automatically. "
         "Match what would naturally perform well on Instagram/Reels. Prioritize authenticity over aesthetics."
     ),
+}
+
+LENGTH_GUIDES = {
+    "short":  "LENGTH: Ultra-concise. 1–2 lines max before hashtags. Every word earns its place. Cut everything that doesn't hit.",
+    "medium": "LENGTH: 2–4 lines before hashtags. Room for a hook and one real thought. Don't overstay.",
+    "long":   "LENGTH: 4–7 lines before hashtags. Space for a real story, a moment, vulnerability, or layered observation. Still tight — no filler lines.",
 }
 
 
@@ -262,11 +310,12 @@ def parse_music(raw: str) -> list[dict]:
     return music[:3]
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto") -> dict:
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length: str = "short") -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
     tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["auto"])
-    system = BRAND_CONTEXT + f"\n\n{tone_guide}" + style_block
+    length_guide = LENGTH_GUIDES.get(length, LENGTH_GUIDES["short"])
+    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}" + style_block
 
     content = []
     for img_b64 in image_b64_list:
@@ -350,7 +399,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
 # --- Routes ---
 
 @app.post("/generate-captions")
-async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto")):
+async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto"), length: str = Form("short")):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
