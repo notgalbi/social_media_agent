@@ -19,15 +19,18 @@ function getAudio() {
 // Unlock AudioContext + both <audio> elements on first touch (capture fires before click).
 (function iosAudioUnlock() {
   function unlock() {
+    // AudioContext unlock
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "running") return;
-    audioCtx.resume().then(() => {
-      const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
-      const src = audioCtx.createBufferSource();
-      src.buffer = buf;
-      src.connect(audioCtx.destination);
-      src.start(0);
-    }).catch(() => {});
+    if (audioCtx.state !== "running") {
+      audioCtx.resume().then(() => {
+        const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(0);
+      }).catch(() => {});
+    }
+    // HTML Audio element unlock — must play a real src so iOS marks them as user-activated
     [cardAudio, trimAudio].forEach(a => {
       a.src = SILENT_SRC;
       a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
@@ -570,6 +573,14 @@ btnGenerate.addEventListener("click", async () => {
   }
 });
 
+function _debugToast(msg) {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:10px 18px;border-radius:10px;z-index:99999;font-size:13px;max-width:90vw;word-break:break-all;text-align:center;";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
 let currentMusicItems = [];
 let currentPreviewBtn = null;
 let previewMusicTrack = null;
@@ -691,6 +702,7 @@ function handlePreview(btn, artist, song) {
   }
 
   const url = cached;
+  _debugToast(`Playing: ${url.slice(0, 60)}…`);
   // Reuse pre-unlocked cardAudio — iOS allows play() on elements unlocked in prior gesture
   currentPreviewBtn = btn;
   cardAudio.src = url;
@@ -703,10 +715,11 @@ function handlePreview(btn, artist, song) {
   cardAudio.play().then(() => {
     btn.textContent = "⏸";
     btn.classList.add("playing");
-  }).catch(() => {
+  }).catch((err) => {
     btn.textContent = "▶";
     btn.classList.remove("playing");
     currentPreviewBtn = null;
+    _debugToast(`play() failed: ${err?.name} — ${err?.message}`);
   });
 }
 
