@@ -258,5 +258,17 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then(reg => {
+        reg.addEventListener("updatefound", () => {
+          const w = reg.installing;
+          w.addEventListener("statechange", () => {
+            if (w.state === "activated") window.location.reload();
+          });
+        });
+      });
+    }
+  </script>
 </body>
 </html>
