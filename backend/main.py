@@ -325,11 +325,25 @@ def parse_captions(raw: str) -> list[str]:
     return captions[:3]
 
 
-def parse_music(raw: str) -> list[dict]:
-    music = []
-    for m in re.finditer(r"MUSIC_\d:\s*(.+?)\s*[-–]\s*(.+?)(?=MUSIC_\d:|$)", raw, re.DOTALL):
-        music.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
-    return music[:3]
+def parse_music(raw: str) -> dict:
+    result = {}
+    for cap in ["1", "2", "3"]:
+        songs = []
+        for mus in ["1", "2", "3"]:
+            m = re.search(rf"MUSIC_{cap}_{mus}:\s*(.+?)\s*[-–]\s*(.+?)(?=\n|MUSIC_|$)", raw, re.DOTALL)
+            if m:
+                songs.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
+        result[cap] = songs
+
+    # Fallback: old flat MUSIC_N format — duplicate across all captions
+    if not any(result.values()):
+        flat = []
+        for m in re.finditer(r"MUSIC_\d:\s*(.+?)\s*[-–]\s*(.+?)(?=MUSIC_\d:|$)", raw, re.DOTALL):
+            flat.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
+        for cap in ["1", "2", "3"]:
+            result[cap] = flat[:3]
+
+    return result
 
 
 def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length_level: int = 2, hashtag_count: int = 5) -> dict:
@@ -370,22 +384,29 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             "Each caption must feel like it was written by a real person — not an AI. "
             "Use natural rhythm, sentence fragments, internet-native phrasing. "
             "End each with 3–5 clean, niche-aware hashtags on a new line.\n\n"
-            "Then suggest 3 real songs currently on Instagram's music library that match the vibe.\n\n"
+            "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
             "Format your response EXACTLY as:\n"
             "CAPTION_1: [full caption with line breaks and hashtags]\n"
             "CAPTION_2: [full caption with line breaks and hashtags]\n"
             "CAPTION_3: [full caption with line breaks and hashtags]\n"
-            "MUSIC_1: [Artist] - [Song Title]\n"
-            "MUSIC_2: [Artist] - [Song Title]\n"
-            "MUSIC_3: [Artist] - [Song Title]\n\n"
-            "Only suggest real, well-known songs available on Instagram Reels."
+            "MUSIC_1_1: [Artist] - [Song Title]\n"
+            "MUSIC_1_2: [Artist] - [Song Title]\n"
+            "MUSIC_1_3: [Artist] - [Song Title]\n"
+            "MUSIC_2_1: [Artist] - [Song Title]\n"
+            "MUSIC_2_2: [Artist] - [Song Title]\n"
+            "MUSIC_2_3: [Artist] - [Song Title]\n"
+            "MUSIC_3_1: [Artist] - [Song Title]\n"
+            "MUSIC_3_2: [Artist] - [Song Title]\n"
+            "MUSIC_3_3: [Artist] - [Song Title]\n\n"
+            "Only suggest real songs that are currently popular and trending on Instagram Reels / TikTok — songs people are actually using right now. "
+            "Prioritize songs with viral moments, trending sounds, or high reel usage. Each caption should have distinctly different music."
         )
     })
 
     start_time = time.perf_counter()
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=700,
+        max_tokens=1100,
         system=system,
         messages=[{"role": "user", "content": content}],
     )

@@ -683,8 +683,8 @@ async function generateCaptions() {
 
     const data = await res.json();
     clearInterval(msgInterval);
+    allMusic = data.music || {};
     renderCaptions(data.captions);
-    renderMusic(data.music || []);
     showScreen("screen-captions");
   } catch (err) {
     clearInterval(msgInterval);
@@ -702,6 +702,7 @@ btnGenerate.addEventListener("click", generateCaptions);
 document.getElementById("btn-refresh").addEventListener("click", generateCaptions);
 
 
+let allMusic = {};          // keyed by "1","2","3" — per-caption music sets
 let currentMusicItems = [];
 let currentPreviewBtn = null;
 let previewMusicTrack = null;
@@ -1017,6 +1018,11 @@ function renderCaptions(captions) {
   capText.textContent = "";
   preview.classList.remove("hidden");
 
+  // Prefetch all music sets in background
+  const allTracks = Object.values(allMusic).flat();
+  prefetchMusicUrls(allTracks);
+
+  const cards = [];
   captions.forEach((text, i) => {
     const card = document.createElement("div");
     card.className = "caption-card";
@@ -1024,21 +1030,34 @@ function renderCaptions(captions) {
       <div class="caption-badge">${CAPTION_LABELS[i] || `Option ${i + 1}`}</div>
       <div class="caption-text">${text}</div>
     `;
-    card.addEventListener("click", () => selectCaption(card, text));
+    card.addEventListener("click", () => selectCaption(card, text, i));
     captionList.appendChild(card);
+    cards.push({ card, text, i });
     setTimeout(() => card.classList.add("visible"), i * 120);
   });
+
+  // Auto-select first caption after cards animate in
+  if (cards.length) {
+    setTimeout(() => selectCaption(cards[0].card, cards[0].text, 0, true), 420);
+  }
 }
 
-function selectCaption(card, text) {
-  playSound("caption-select");
+function selectCaption(card, text, index, silent = false) {
+  if (!silent) playSound("caption-select");
   document.querySelectorAll(".caption-card").forEach(c => c.classList.remove("selected"));
   card.classList.add("selected");
   selectedCaption = text;
   captionEdit.value = text;
   document.getElementById("ig-cap-text").textContent = " " + text;
   selectedWrap.classList.remove("hidden");
-  document.getElementById("post-preview").scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Swap music to the set for this caption
+  const key = String(index + 1);
+  renderMusic(allMusic[key] || []);
+
+  if (!silent) {
+    document.getElementById("post-preview").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function updatePostPreview(text) {

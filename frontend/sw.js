@@ -1,4 +1,4 @@
-const CACHE = "captionly-v1778195619";
+const CACHE = "captionly-v1778196174";
 const ASSETS = ["/", "/index.html", "/app.js", "/style.css", "/manifest.json", "/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
