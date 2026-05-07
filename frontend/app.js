@@ -680,22 +680,23 @@ function handlePreview(btn, artist, song) {
   const cached = musicUrlCache[key];
 
   if (cached === undefined || cached === "loading") {
-    // Still fetching — show loading and auto-play when ready
+    _debugToast(`Fetching iTunes URL… key="${key}" state=${cached}`);
     btn.textContent = "…";
     currentPreviewBtn = btn;
     const poll = setInterval(() => {
       const v = musicUrlCache[key];
       if (v === undefined || v === "loading") return;
       clearInterval(poll);
-      if (currentPreviewBtn !== btn) return; // user moved on
-      if (!v) { btn.textContent = "▶"; currentPreviewBtn = null; return; }
+      if (currentPreviewBtn !== btn) return;
+      if (!v) { _debugToast(`iTunes returned no preview for: ${key}`); btn.textContent = "▶"; currentPreviewBtn = null; return; }
       btn.textContent = "▶";
-      handlePreview(btn, artist, song); // retry now that URL is ready
+      handlePreview(btn, artist, song);
     }, 150);
     return;
   }
 
   if (!cached) {
+    _debugToast(`No iTunes preview found for: ${key}`);
     btn.textContent = "—";
     setTimeout(() => btn.textContent = "▶", 2000);
     return;
