@@ -45,13 +45,15 @@ STORE_PATH = Path(__file__).parent / "captions_store.json"
 UPLOADS_DIR = Path(__file__).parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-META_APP_ID     = os.getenv("META_APP_ID", "")
+META_APP_ID = os.getenv("META_APP_ID", "")
 META_APP_SECRET = os.getenv("META_APP_SECRET", "")
-BACKEND_URL     = os.getenv("PUBLIC_URL", "http://localhost:8000")
-FRONTEND_URL    = os.getenv("FRONTEND_URL", "http://localhost:3000")
-REDIRECT_URI    = f"{BACKEND_URL}/auth/callback"
+BACKEND_URL = os.getenv("PUBLIC_URL", "http://localhost:8000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+REDIRECT_URI = f"{BACKEND_URL}/auth/callback"
 
-IG_SCOPES = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+IG_SCOPES = (
+    "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+)
 
 app = FastAPI()
 
@@ -213,10 +215,15 @@ def get_hashtag_guide(count: int) -> str:
 
 # --- Store helpers ---
 
+
 def load_store() -> dict:
     if STORE_PATH.exists():
         return json.loads(STORE_PATH.read_text())
-    return {"example_captions": [], "instagram_access_token": "", "instagram_user_id": ""}
+    return {
+        "example_captions": [],
+        "instagram_access_token": "",
+        "instagram_user_id": "",
+    }
 
 
 def save_store(data: dict):
@@ -225,16 +232,20 @@ def save_store(data: dict):
 
 # --- Pydantic models ---
 
+
 class CaptionsPayload(BaseModel):
     captions: list[str]
+
 
 class InstagramTokenPayload(BaseModel):
     access_token: str
     user_id: str
 
+
 class BufferTokenPayload(BaseModel):
     access_token: str
     profile_id: str
+
 
 class PostPayload(BaseModel):
     caption: str
@@ -267,7 +278,7 @@ def compress_to_b64(img_bytes: bytes, max_b64_bytes: int = MAX_B64_BYTES) -> str
                 "event": "compress_to_b64",
                 "original_bytes": original_size,
                 "final_b64_bytes": len(b64),
-                "duration_s": round(duration, 3)
+                "duration_s": round(duration, 3),
             }
             log.info(json.dumps(log_data))
             return b64
@@ -294,6 +305,7 @@ def extract_frames(video_path: str, num_frames: int = 3) -> list[str]:
 
 # --- Caption generation ---
 
+
 def build_style_block(example_captions: list[str]) -> str:
     if not example_captions:
         return ""
@@ -306,7 +318,9 @@ def build_style_block(example_captions: list[str]) -> str:
 
 
 def parse_captions(raw: str) -> list[str]:
-    captions = re.findall(r"CAPTION_\d:\s*(.+?)(?=CAPTION_\d:|MUSIC_|$)", raw, re.DOTALL)
+    captions = re.findall(
+        r"CAPTION_\d:\s*(.+?)(?=CAPTION_\d:|MUSIC_|$)", raw, re.DOTALL
+    )
     captions = [c.strip() for c in captions if c.strip()]
 
     if len(captions) < 3:
@@ -314,12 +328,17 @@ def parse_captions(raw: str) -> list[str]:
         captions = [c.strip() for c in captions if c.strip()]
 
     if len(captions) < 3:
-        lines = [l.strip() for l in raw.strip().split("\n") if l.strip()
-                 and not l.strip().startswith("MUSIC")]
+        lines = [
+            l.strip()
+            for l in raw.strip().split("\n")
+            if l.strip() and not l.strip().startswith("MUSIC")
+        ]
         captions = lines[:3]
 
     while len(captions) < 3:
-        captions.append("Fresh, bold, and built for your goals. DM us to book your weekly meal prep.")
+        captions.append(
+            "Fresh, bold, and built for your goals. DM us to book your weekly meal prep."
+        )
 
     return captions[:3]
 
@@ -330,7 +349,9 @@ def parse_music(raw: str) -> dict:
         songs = []
         for mus in ["1", "2", "3"]:
             # Line-by-line match — MULTILINE so $ = end of line, handles all dash types
-            m = re.search(rf"MUSIC_{cap}_{mus}:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE)
+            m = re.search(
+                rf"MUSIC_{cap}_{mus}:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE
+            )
             if m:
                 songs.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
         result[cap] = songs
@@ -338,7 +359,9 @@ def parse_music(raw: str) -> dict:
     # Fallback: flat MUSIC_N format — duplicate across all captions
     if not any(result.values()):
         flat = []
-        for m in re.finditer(r"MUSIC_\d:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE):
+        for m in re.finditer(
+            r"MUSIC_\d:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE
+        ):
             flat.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
         for cap in ["1", "2", "3"]:
             result[cap] = flat[:3]
@@ -360,7 +383,15 @@ GENRE_LABELS = {
 }
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length_level: int = 2, hashtag_count: int = 5, music_genre: str = "auto") -> dict:
+def generate_content(
+    image_b64_list: list[str],
+    media_type: str = "image/jpeg",
+    num_source_files: int = 1,
+    tone: str = "auto",
+    length_level: int = 2,
+    hashtag_count: int = 5,
+    music_genre: str = "auto",
+) -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
     tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["auto"])
@@ -369,17 +400,23 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     genre_label = GENRE_LABELS.get(music_genre)
     genre_guide = (
         f"MUSIC GENRE: Suggest only {genre_label} songs. All 9 music suggestions must be {genre_label} tracks."
-        if genre_label else
-        "MUSIC GENRE: Choose the genre that best matches the caption's energy and visual mood."
+        if genre_label
+        else "MUSIC GENRE: Choose the genre that best matches the caption's energy and visual mood."
     )
-    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{genre_guide}" + style_block
+    system = (
+        BRAND_CONTEXT
+        + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{genre_guide}"
+        + style_block
+    )
 
     content = []
     for img_b64 in image_b64_list:
-        content.append({
-            "type": "image",
-            "source": {"type": "base64", "media_type": media_type, "data": img_b64}
-        })
+        content.append(
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": media_type, "data": img_b64},
+            }
+        )
 
     if num_source_files > 1:
         image_context = (
@@ -388,9 +425,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             "Write captions that describe or celebrate the full set, not just a single image."
         )
     else:
-        image_context = (
-            "Look closely at this image — the subject, mood, colors, setting, and details."
-        )
+        image_context = "Look closely at this image — the subject, mood, colors, setting, and details."
 
     if hashtag_count == 0:
         hashtag_instruction = "Do NOT include any hashtags in any caption."
@@ -398,36 +433,38 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
         tag_plural = "s" if hashtag_count > 1 else ""
         hashtag_instruction = f"End each caption with exactly {hashtag_count} niche-aware hashtag{tag_plural} on a new line — no more, no less."
 
-    content.append({
-        "type": "text",
-        "text": (
-            f"{image_context} Write 3 Instagram captions. "
-            "Match the creator's voice exactly if example captions are provided.\n\n"
-            "Generate 3 distinct versions (each must match the LENGTH instruction exactly):\n"
-            "1. Vibe Caption — mood-forward, emotionally aesthetic, dreamy.\n"
-            "2. Hook Caption — POV/question/opening statement, strongest engagement potential.\n"
-            "3. Story Caption — feels personal, believable lived moment, emotional realism.\n\n"
-            "Each caption must feel like it was written by a real person — not an AI. "
-            "Use natural rhythm, sentence fragments, internet-native phrasing. "
-            f"{hashtag_instruction}\n\n"
-            "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
-            "Format your response EXACTLY as:\n"
-            "CAPTION_1: [full caption with line breaks and hashtags]\n"
-            "CAPTION_2: [full caption with line breaks and hashtags]\n"
-            "CAPTION_3: [full caption with line breaks and hashtags]\n"
-            "MUSIC_1_1: [Artist] - [Song Title]\n"
-            "MUSIC_1_2: [Artist] - [Song Title]\n"
-            "MUSIC_1_3: [Artist] - [Song Title]\n"
-            "MUSIC_2_1: [Artist] - [Song Title]\n"
-            "MUSIC_2_2: [Artist] - [Song Title]\n"
-            "MUSIC_2_3: [Artist] - [Song Title]\n"
-            "MUSIC_3_1: [Artist] - [Song Title]\n"
-            "MUSIC_3_2: [Artist] - [Song Title]\n"
-            "MUSIC_3_3: [Artist] - [Song Title]\n\n"
-            "Only suggest real songs that are currently popular and trending on Instagram Reels / TikTok — songs people are actually using right now. "
-            "Prioritize songs with viral moments, trending sounds, or high reel usage. Each caption should have distinctly different music."
-        )
-    })
+    content.append(
+        {
+            "type": "text",
+            "text": (
+                f"{image_context} Write 3 Instagram captions. "
+                "Match the creator's voice exactly if example captions are provided.\n\n"
+                "Generate 3 distinct versions (each must match the LENGTH instruction exactly):\n"
+                "1. Vibe Caption — mood-forward, emotionally aesthetic, dreamy.\n"
+                "2. Hook Caption — POV/question/opening statement, strongest engagement potential.\n"
+                "3. Story Caption — feels personal, believable lived moment, emotional realism.\n\n"
+                "Each caption must feel like it was written by a real person — not an AI. "
+                "Use natural rhythm, sentence fragments, internet-native phrasing. "
+                f"{hashtag_instruction}\n\n"
+                "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
+                "Format your response EXACTLY as:\n"
+                "CAPTION_1: [full caption with line breaks and hashtags]\n"
+                "CAPTION_2: [full caption with line breaks and hashtags]\n"
+                "CAPTION_3: [full caption with line breaks and hashtags]\n"
+                "MUSIC_1_1: [Artist] - [Song Title]\n"
+                "MUSIC_1_2: [Artist] - [Song Title]\n"
+                "MUSIC_1_3: [Artist] - [Song Title]\n"
+                "MUSIC_2_1: [Artist] - [Song Title]\n"
+                "MUSIC_2_2: [Artist] - [Song Title]\n"
+                "MUSIC_2_3: [Artist] - [Song Title]\n"
+                "MUSIC_3_1: [Artist] - [Song Title]\n"
+                "MUSIC_3_2: [Artist] - [Song Title]\n"
+                "MUSIC_3_3: [Artist] - [Song Title]\n\n"
+                "Only suggest real songs that are currently popular and trending on Instagram Reels / TikTok — songs people are actually using right now. "
+                "Prioritize songs with viral moments, trending sounds, or high reel usage. Each caption should have distinctly different music."
+            ),
+        }
+    )
 
     start_time = time.perf_counter()
     message = client.messages.create(
@@ -440,7 +477,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
 
     raw = message.content[0].text
     usage = message.usage
-    input_tokens  = usage.input_tokens
+    input_tokens = usage.input_tokens
     output_tokens = usage.output_tokens
     # Haiku pricing: $0.80/M input, $4.00/M output
     cost_usd = (input_tokens * 0.0000008) + (output_tokens * 0.000004)
@@ -455,10 +492,10 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
         "duration_s": round(duration, 3),
     }
     log.info(json.dumps(log_data))
-    TOKEN_STATS["total_input"]  += input_tokens
+    TOKEN_STATS["total_input"] += input_tokens
     TOKEN_STATS["total_output"] += output_tokens
-    TOKEN_STATS["total_cost"]   += cost_usd
-    TOKEN_STATS["total_calls"]  += 1
+    TOKEN_STATS["total_cost"] += cost_usd
+    TOKEN_STATS["total_calls"] += 1
 
     return {
         "captions": parse_captions(raw),
@@ -468,14 +505,24 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
 
 # --- Routes ---
 
+
 @app.post("/generate-captions")
-async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto"), length_level: int = Form(2), hashtag_count: int = Form(5), music_genre: str = Form("auto")):
+async def generate_captions_endpoint(
+    files: list[UploadFile] = File(...),
+    tone: str = Form("auto"),
+    length_level: int = Form(2),
+    hashtag_count: int = Form(5),
+    music_genre: str = Form("auto"),
+):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
     ext_to_mime = {
-        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-        ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
     }
 
     all_frames: list[str] = []
@@ -505,42 +552,66 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: 
         raise HTTPException(status_code=400, detail="No supported files found")
 
     start_time = time.perf_counter()
-    log.info(json.dumps({
-        "event": "generate_captions_start",
-        "num_files": len(files),
-        "num_frames": len(all_frames),
-        "tone": tone,
-        "length_level": length_level,
-        "hashtag_count": hashtag_count,
-        "music_genre": music_genre
-    }))
+    log.info(
+        json.dumps(
+            {
+                "event": "generate_captions_start",
+                "num_files": len(files),
+                "num_frames": len(all_frames),
+                "tone": tone,
+                "length_level": length_level,
+                "hashtag_count": hashtag_count,
+                "music_genre": music_genre,
+            }
+        )
+    )
 
     try:
-        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone, length_level=length_level, hashtag_count=hashtag_count, music_genre=music_genre)
+        result = generate_content(
+            all_frames,
+            last_media_type,
+            num_source_files=len(files),
+            tone=tone,
+            length_level=length_level,
+            hashtag_count=hashtag_count,
+            music_genre=music_genre,
+        )
         duration = time.perf_counter() - start_time
-        log.info(json.dumps({"event": "generate_captions_success", "duration_s": round(duration, 3), "num_captions": len(result.get("captions", []))}))
+        log.info(
+            json.dumps(
+                {
+                    "event": "generate_captions_success",
+                    "duration_s": round(duration, 3),
+                    "num_captions": len(result.get("captions", [])),
+                }
+            )
+        )
         return result
     except Exception as e:
         duration = time.perf_counter() - start_time
         error_log = {
             "event": "generate_captions_error",
             "error": str(e),
-            "duration_s": round(duration, 3)
+            "duration_s": round(duration, 3),
         }
         log.error(json.dumps(error_log), exc_info=True)
-        LOG_ENTRIES.append({
-            "time": datetime.now(timezone.utc).isoformat(),
-            "method": "POST",
-            "path": "/generate-captions",
-            "status": 500,
-            "duration_s": round(duration, 3),
-            "error": str(e),
-        })
+        LOG_ENTRIES.append(
+            {
+                "time": datetime.now(timezone.utc).isoformat(),
+                "method": "POST",
+                "path": "/generate-captions",
+                "status": 500,
+                "duration_s": round(duration, 3),
+                "error": str(e),
+            }
+        )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         for p in tmp_paths:
-            try: os.unlink(p)
-            except: pass
+            try:
+                os.unlink(p)
+            except:
+                pass
 
 
 # Manually paste example captions
@@ -576,7 +647,10 @@ async def sync_instagram_captions():
     user_id = store.get("instagram_user_id")
 
     if not token or not user_id:
-        raise HTTPException(status_code=400, detail="Instagram not connected. Add your access token first.")
+        raise HTTPException(
+            status_code=400,
+            detail="Instagram not connected. Add your access token first.",
+        )
 
     url = f"https://graph.instagram.com/{user_id}/media"
     params = {"fields": "caption", "access_token": token, "limit": 20}
@@ -608,7 +682,10 @@ async def get_buffer_profiles(access_token: str):
         raise HTTPException(status_code=502, detail="Invalid token or Buffer error")
     profiles = res.json()
     instagram = [
-        {"id": p["id"], "name": p.get("formatted_username", p.get("service_username", "Instagram"))}
+        {
+            "id": p["id"],
+            "name": p.get("formatted_username", p.get("service_username", "Instagram")),
+        }
         for p in profiles
         if p.get("service") == "instagram"
     ]
@@ -622,7 +699,9 @@ async def save_buffer_token(payload: BufferTokenPayload):
     store["buffer_access_token"] = payload.access_token
     store["buffer_profile_id"] = payload.profile_id
     save_store(store)
-    log.info(json.dumps({"event": "buffer_connected", "profile_id": payload.profile_id}))
+    log.info(
+        json.dumps({"event": "buffer_connected", "profile_id": payload.profile_id})
+    )
 
     # auto-sync Instagram captions to train Claude on their voice
     if payload.access_token and payload.profile_id:
@@ -633,9 +712,20 @@ async def save_buffer_token(payload: BufferTokenPayload):
             if ig_captions:
                 store["example_captions"] = ig_captions
                 save_store(store)
-                log.info(json.dumps({"event": "buffer_auto_sync_captions_success", "num_captions": len(ig_captions)}))
+                log.info(
+                    json.dumps(
+                        {
+                            "event": "buffer_auto_sync_captions_success",
+                            "num_captions": len(ig_captions),
+                        }
+                    )
+                )
         except Exception as e:
-            log.warning(json.dumps({"event": "buffer_auto_sync_captions_failed", "error": str(e)}))
+            log.warning(
+                json.dumps(
+                    {"event": "buffer_auto_sync_captions_failed", "error": str(e)}
+                )
+            )
 
     return {"status": "saved"}
 
@@ -647,7 +737,9 @@ class BufferTokenWithUsername(BufferTokenPayload):
 @app.get("/settings/buffer")
 async def get_buffer_status():
     store = load_store()
-    connected = bool(store.get("buffer_access_token") and store.get("buffer_profile_id"))
+    connected = bool(
+        store.get("buffer_access_token") and store.get("buffer_profile_id")
+    )
     return {"connected": connected, "username": store.get("buffer_username", "")}
 
 
@@ -669,7 +761,10 @@ async def post_to_instagram(payload: PostPayload):
     profile_id = store.get("buffer_profile_id")
 
     if not token or not profile_id:
-        raise HTTPException(status_code=400, detail="Buffer not connected. Add your Buffer token in settings.")
+        raise HTTPException(
+            status_code=400,
+            detail="Buffer not connected. Add your Buffer token in settings.",
+        )
 
     host = os.getenv("PUBLIC_URL", "http://localhost:8000")
     image_url = f"{host}/media/{payload.image_filename}"
@@ -694,17 +789,20 @@ async def post_to_instagram(payload: PostPayload):
 
 # ── Instagram OAuth ──
 
+
 @app.get("/auth/instagram")
 async def instagram_login():
     """Redirect user to Instagram/Facebook login."""
     state = secrets.token_urlsafe(16)
-    params = urlencode({
-        "client_id": META_APP_ID,
-        "redirect_uri": REDIRECT_URI,
-        "scope": IG_SCOPES,
-        "response_type": "code",
-        "state": state,
-    })
+    params = urlencode(
+        {
+            "client_id": META_APP_ID,
+            "redirect_uri": REDIRECT_URI,
+            "scope": IG_SCOPES,
+            "response_type": "code",
+            "state": state,
+        }
+    )
     return RedirectResponse(f"https://www.facebook.com/dialog/oauth?{params}")
 
 
@@ -728,7 +826,15 @@ async def instagram_callback(code: str = None, error: str = None):
         )
 
     if token_res.status_code != 200:
-        log.error(json.dumps({"event": "instagram_token_exchange_failed", "error": token_res.text, "status_code": token_res.status_code}))
+        log.error(
+            json.dumps(
+                {
+                    "event": "instagram_token_exchange_failed",
+                    "error": token_res.text,
+                    "status_code": token_res.status_code,
+                }
+            )
+        )
         return RedirectResponse(f"{FRONTEND_URL}?auth=error")
 
     token_data = token_res.json()
@@ -752,7 +858,10 @@ async def instagram_callback(code: str = None, error: str = None):
     async with httpx.AsyncClient() as http:
         pages_res = await http.get(
             "https://graph.facebook.com/v19.0/me/accounts",
-            params={"access_token": access_token, "fields": "id,name,instagram_business_account"},
+            params={
+                "access_token": access_token,
+                "fields": "id,name,instagram_business_account",
+            },
         )
 
     ig_user_id = None
@@ -788,21 +897,44 @@ async def instagram_callback(code: str = None, error: str = None):
             async with httpx.AsyncClient() as http:
                 media_res = await http.get(
                     f"https://graph.facebook.com/v19.0/{ig_user_id}/media",
-                    params={"fields": "caption", "access_token": access_token, "limit": 20},
+                    params={
+                        "fields": "caption",
+                        "access_token": access_token,
+                        "limit": 20,
+                    },
                 )
             if media_res.status_code == 200:
                 captions = [
-                    p["caption"] for p in media_res.json().get("data", [])
+                    p["caption"]
+                    for p in media_res.json().get("data", [])
                     if p.get("caption", "").strip()
                 ]
                 if captions:
                     store["example_captions"] = captions
                     save_store(store)
-                    log.info(json.dumps({"event": "instagram_auto_sync_captions_success", "num_captions": len(captions), "username": ig_username}))
+                    log.info(
+                        json.dumps(
+                            {
+                                "event": "instagram_auto_sync_captions_success",
+                                "num_captions": len(captions),
+                                "username": ig_username,
+                            }
+                        )
+                    )
         except Exception as e:
-            log.warning(json.dumps({"event": "instagram_caption_sync_failed", "error": str(e)}))
+            log.warning(
+                json.dumps({"event": "instagram_caption_sync_failed", "error": str(e)})
+            )
 
-    log.info(json.dumps({"event": "instagram_connected", "username": ig_username, "user_id": ig_user_id}))
+    log.info(
+        json.dumps(
+            {
+                "event": "instagram_connected",
+                "username": ig_username,
+                "user_id": ig_user_id,
+            }
+        )
+    )
     return RedirectResponse(f"{FRONTEND_URL}?auth=success&username={ig_username}")
 
 
@@ -850,6 +982,7 @@ TOKEN_STATS: dict = {
     "total_cost": 0.0,
 }
 
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = datetime.now(timezone.utc)
@@ -865,13 +998,17 @@ async def log_requests(request: Request, call_next):
     LOG_ENTRIES.append(entry)
     if len(LOG_ENTRIES) > 200:
         LOG_ENTRIES.pop(0)
-    log.info(json.dumps({
-        "event": "http_request",
-        "method": request.method,
-        "path": request.url.path,
-        "status_code": response.status_code,
-        "duration_s": round(duration, 3)
-    }))
+    log.info(
+        json.dumps(
+            {
+                "event": "http_request",
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_s": round(duration, 3),
+            }
+        )
+    )
     return response
 
 
@@ -892,21 +1029,28 @@ async def music_preview(artist: str = "", song: str = ""):
     async with httpx.AsyncClient(timeout=8) as c:
 
         async def itunes(term: str):
-            r = await c.get("https://itunes.apple.com/search", params={"term": term, "media": "music", "limit": 5})
-            hit = next((x for x in r.json().get("results", []) if x.get("previewUrl")), None)
+            r = await c.get(
+                "https://itunes.apple.com/search",
+                params={"term": term, "media": "music", "limit": 5},
+            )
+            hit = next(
+                (x for x in r.json().get("results", []) if x.get("previewUrl")), None
+            )
             return hit["previewUrl"] if hit else None
 
         async def deezer(term: str):
-            r = await c.get("https://api.deezer.com/search", params={"q": term, "limit": 5})
+            r = await c.get(
+                "https://api.deezer.com/search", params={"q": term, "limit": 5}
+            )
             hit = next((x for x in r.json().get("data", []) if x.get("preview")), None)
             return hit["preview"] if hit else None
 
         full = f"{artist} {song}"
         url = (
-            await itunes(full) or
-            await itunes(song) or
-            await deezer(full) or
-            await deezer(song)
+            await itunes(full)
+            or await itunes(song)
+            or await deezer(full)
+            or await deezer(song)
         )
         return {"previewUrl": url}
 
