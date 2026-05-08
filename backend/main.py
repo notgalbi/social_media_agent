@@ -392,6 +392,12 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             "Look closely at this image — the subject, mood, colors, setting, and details."
         )
 
+    if hashtag_count == 0:
+        hashtag_instruction = "Do NOT include any hashtags in any caption."
+    else:
+        tag_plural = "s" if hashtag_count > 1 else ""
+        hashtag_instruction = f"End each caption with exactly {hashtag_count} niche-aware hashtag{tag_plural} on a new line — no more, no less."
+
     content.append({
         "type": "text",
         "text": (
@@ -403,7 +409,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             "3. Story Caption — feels personal, believable lived moment, emotional realism.\n\n"
             "Each caption must feel like it was written by a real person — not an AI. "
             "Use natural rhythm, sentence fragments, internet-native phrasing. "
-            f"{'Do NOT include any hashtags in any caption.' if hashtag_count == 0 else f'End each caption with exactly {hashtag_count} niche-aware hashtag{\"s\" if hashtag_count > 1 else \"\"} on a new line — no more, no less.'}\n\n"
+            f"{hashtag_instruction}\n\n"
             "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
             "Format your response EXACTLY as:\n"
             "CAPTION_1: [full caption with line breaks and hashtags]\n"
