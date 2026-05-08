@@ -196,11 +196,11 @@ TONE_GUIDES = {
 
 def get_length_guide(level: int) -> str:
     guides = {
-        1: "LENGTH: Exactly 1 line before hashtags. One perfect, punchy thought. Cut everything else.",
-        2: "LENGTH: 1–2 lines before hashtags. Every word earns its place. Tight.",
-        3: "LENGTH: 3–4 lines before hashtags. Room for a hook and one real thought.",
-        4: "LENGTH: 5–6 lines before hashtags. Space for emotion, context, and depth.",
-        5: "LENGTH: 7–10 lines before hashtags. Full narrative — a real moment, vulnerability, or layered story. No filler lines.",
+        1: "LENGTH (CRITICAL): Every caption = exactly 1 line of text before hashtags. One tight, punchy thought. If it's longer, cut it.",
+        2: "LENGTH (CRITICAL): Every caption = 1–2 lines of text before hashtags. Short and deliberate. Cut any word that doesn't earn its place.",
+        3: "LENGTH (CRITICAL): Every caption = 3–4 lines of text before hashtags. Hook + one real thought.",
+        4: "LENGTH (CRITICAL): Every caption = 5–6 lines of text before hashtags. Room for emotion, context, and depth.",
+        5: "LENGTH (CRITICAL): Every caption = 7–10 lines of text before hashtags. Full narrative — vulnerability, story, real lived moment. No filler.",
     }
     return guides.get(level, guides[2])
 
@@ -377,10 +377,10 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
         "text": (
             f"{image_context} Write 3 Instagram captions. "
             "Match the creator's voice exactly if example captions are provided.\n\n"
-            "Generate 3 distinct versions:\n"
-            "1. Vibe Caption — mood-forward, short, emotionally aesthetic. 1–2 lines + hashtags.\n"
-            "2. Hook Caption — POV/question/opening statement, strongest engagement potential. 1–3 lines + hashtags.\n"
-            "3. Story Caption — feels personal, believable lived moment, emotional realism. 2–3 lines + hashtags.\n\n"
+            "Generate 3 distinct versions (each must match the LENGTH instruction exactly):\n"
+            "1. Vibe Caption — mood-forward, emotionally aesthetic, dreamy.\n"
+            "2. Hook Caption — POV/question/opening statement, strongest engagement potential.\n"
+            "3. Story Caption — feels personal, believable lived moment, emotional realism.\n\n"
             "Each caption must feel like it was written by a real person — not an AI. "
             "Use natural rhythm, sentence fragments, internet-native phrasing. "
             f"{'Do NOT include any hashtags in any caption.' if hashtag_count == 0 else f'End each caption with exactly {hashtag_count} niche-aware hashtag{\"s\" if hashtag_count > 1 else \"\"} on a new line — no more, no less.'}\n\n"
