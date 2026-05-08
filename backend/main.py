@@ -87,9 +87,8 @@ USE: sentence fragments, lowercase naturally sometimes, rhythm breaks, selective
 AVOID: excessive adjectives, excessive positivity, "embrace the journey", "living my best life", "radiating energy", "capturing moments", obvious image narration, cringe AI metaphors, overly complete grammar.
 
 GLOBAL RULES:
-- 1–3 short lines before hashtags
 - Start with a strong hook that creates curiosity, relatability, tension, or emotion
-- End with 3–5 CLEAN hashtags maximum — niche-aware, never spam blocks
+- Follow the HASHTAGS instruction exactly — use precisely the count specified, no more, no less
 - If example captions from the creator are provided, match their exact vocabulary, emoji style, and punctuation perfectly
 - Prioritize SAVEABLE captions over pretty captions — make each feel distinct
 - You must ALWAYS respond with exactly 3 captions and 3 music suggestions in the required format
@@ -208,8 +207,8 @@ def get_length_guide(level: int) -> str:
 
 def get_hashtag_guide(count: int) -> str:
     if count == 0:
-        return "HASHTAGS: Do not include any hashtags. End the caption without them."
-    return f"HASHTAGS: End with exactly {count} relevant, niche-aware hashtag{'s' if count > 1 else ''} on a new line. No more, no less."
+        return "HASHTAGS (CRITICAL): Do NOT include any hashtags whatsoever in any caption. Zero hashtags. End every caption without them."
+    return f"HASHTAGS (CRITICAL): End every caption with EXACTLY {count} relevant, niche-aware hashtag{'s' if count > 1 else ''} on a new line. Not {count - 1}, not {count + 1} — exactly {count}."
 
 
 # --- Store helpers ---
@@ -330,15 +329,16 @@ def parse_music(raw: str) -> dict:
     for cap in ["1", "2", "3"]:
         songs = []
         for mus in ["1", "2", "3"]:
-            m = re.search(rf"MUSIC_{cap}_{mus}:\s*(.+?)\s*[-–]\s*(.+?)(?=\n|MUSIC_|$)", raw, re.DOTALL)
+            # Line-by-line match — MULTILINE so $ = end of line, handles all dash types
+            m = re.search(rf"MUSIC_{cap}_{mus}:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE)
             if m:
                 songs.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
         result[cap] = songs
 
-    # Fallback: old flat MUSIC_N format — duplicate across all captions
+    # Fallback: flat MUSIC_N format — duplicate across all captions
     if not any(result.values()):
         flat = []
-        for m in re.finditer(r"MUSIC_\d:\s*(.+?)\s*[-–]\s*(.+?)(?=MUSIC_\d:|$)", raw, re.DOTALL):
+        for m in re.finditer(r"MUSIC_\d:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE):
             flat.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
         for cap in ["1", "2", "3"]:
             result[cap] = flat[:3]
@@ -383,7 +383,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
             "3. Story Caption — feels personal, believable lived moment, emotional realism. 2–3 lines + hashtags.\n\n"
             "Each caption must feel like it was written by a real person — not an AI. "
             "Use natural rhythm, sentence fragments, internet-native phrasing. "
-            "End each with 3–5 clean, niche-aware hashtags on a new line.\n\n"
+            f"{'Do NOT include any hashtags in any caption.' if hashtag_count == 0 else f'End each caption with exactly {hashtag_count} niche-aware hashtag{\"s\" if hashtag_count > 1 else \"\"} on a new line — no more, no less.'}\n\n"
             "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
             "Format your response EXACTLY as:\n"
             "CAPTION_1: [full caption with line breaks and hashtags]\n"
@@ -406,7 +406,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     start_time = time.perf_counter()
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=1100,
+        max_tokens=1400,
         system=system,
         messages=[{"role": "user", "content": content}],
     )
