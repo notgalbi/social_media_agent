@@ -392,13 +392,24 @@ let selectedCaption = "";
 let selectedTone = "auto";
 let selectedLengthLevel = 2;
 let selectedHashtagCount = 5;
+let selectedMusicGenre = "auto";
 
 // Tone pill selection
-document.querySelectorAll(".tone-pill").forEach(pill => {
+document.querySelectorAll(".tone-pill:not(.genre-pill)").forEach(pill => {
   pill.addEventListener("click", () => {
-    document.querySelectorAll(".tone-pill").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".tone-pill:not(.genre-pill)").forEach(p => p.classList.remove("active"));
     pill.classList.add("active");
     selectedTone = pill.dataset.tone;
+    playSound("click");
+  });
+});
+
+// Genre pill selection
+document.querySelectorAll(".genre-pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    document.querySelectorAll(".genre-pill").forEach(p => p.classList.remove("active"));
+    pill.classList.add("active");
+    selectedMusicGenre = pill.dataset.genre;
     playSound("click");
   });
 });
@@ -649,6 +660,7 @@ async function generateCaptions() {
   formData.append("tone", selectedTone);
   formData.append("length_level", selectedLengthLevel);
   formData.append("hashtag_count", selectedHashtagCount);
+  formData.append("music_genre", selectedMusicGenre);
 
   const loaderText = document.getElementById("loader-text");
   const isCarousel = selectedFiles.length > 1;

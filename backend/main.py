@@ -346,13 +346,33 @@ def parse_music(raw: str) -> dict:
     return result
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length_level: int = 2, hashtag_count: int = 5) -> dict:
+GENRE_LABELS = {
+    "auto": None,
+    "pop": "Pop",
+    "rnb": "R&B / Soul",
+    "hiphop": "Hip-Hop / Rap",
+    "indie": "Indie / Alternative",
+    "electronic": "Electronic / Dance (EDM)",
+    "chill": "Chill / Lo-fi / Ambient",
+    "country": "Country / Folk",
+    "latin": "Latin / Reggaeton",
+    "kpop": "K-Pop",
+}
+
+
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tone: str = "auto", length_level: int = 2, hashtag_count: int = 5, music_genre: str = "auto") -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
     tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["auto"])
     length_guide = get_length_guide(length_level)
     hashtag_guide = get_hashtag_guide(hashtag_count)
-    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}" + style_block
+    genre_label = GENRE_LABELS.get(music_genre)
+    genre_guide = (
+        f"MUSIC GENRE: Suggest only {genre_label} songs. All 9 music suggestions must be {genre_label} tracks."
+        if genre_label else
+        "MUSIC GENRE: Choose the genre that best matches the caption's energy and visual mood."
+    )
+    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{genre_guide}" + style_block
 
     content = []
     for img_b64 in image_b64_list:
@@ -443,7 +463,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
 # --- Routes ---
 
 @app.post("/generate-captions")
-async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto"), length_level: int = Form(2), hashtag_count: int = Form(5)):
+async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: str = Form("auto"), length_level: int = Form(2), hashtag_count: int = Form(5), music_genre: str = Form("auto")):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
@@ -485,11 +505,12 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tone: 
         "num_frames": len(all_frames),
         "tone": tone,
         "length_level": length_level,
-        "hashtag_count": hashtag_count
+        "hashtag_count": hashtag_count,
+        "music_genre": music_genre
     }))
 
     try:
-        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone, length_level=length_level, hashtag_count=hashtag_count)
+        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tone=tone, length_level=length_level, hashtag_count=hashtag_count, music_genre=music_genre)
         duration = time.perf_counter() - start_time
         log.info(json.dumps({"event": "generate_captions_success", "duration_s": round(duration, 3), "num_captions": len(result.get("captions", []))}))
         return result
