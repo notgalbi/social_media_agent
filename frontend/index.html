@@ -47,8 +47,6 @@
     <header class="header hidden" id="main-header">
       <div class="logo">Captionly</div>
       <div class="user-pill hidden" id="user-pill"></div>
-      <button class="btn-drafts" id="btn-drafts" title="Saved Drafts">📋</button>
-      <button class="btn-settings" id="btn-settings">⚙</button>
     </header>
 
     <!-- Upload Screen -->
@@ -261,20 +259,25 @@
     <section class="screen hidden" id="screen-success">
       <div class="success-wrap">
         <div class="success-icon">✓</div>
-        <h2>Caption Ready</h2>
-        <p>Your caption is copied to clipboard. Paste it when posting to Instagram.</p>
+        <h2>Caption Copied</h2>
+        <p>Instagram is opening — paste your caption when you're ready to post.</p>
         <button class="btn-primary" id="btn-new">New Post</button>
       </div>
     </section>
 
     <!-- Drafts Screen -->
     <section class="screen hidden" id="screen-drafts">
-      <div class="drafts-header">
-        <h2 class="section-title">Saved Drafts</h2>
-        <button class="btn-drafts-back" id="btn-drafts-back">✕</button>
+      <h2 class="section-title" style="padding-top:4px">Calendar</h2>
+      <div class="calendar-wrap">
+        <div class="calendar-nav">
+          <button class="cal-nav-btn" id="cal-prev">‹</button>
+          <span class="calendar-month-label" id="calendar-month-label"></span>
+          <button class="cal-nav-btn" id="cal-next">›</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
       </div>
       <div class="drafts-empty hidden" id="drafts-empty">
-        <div class="drafts-empty-icon">📋</div>
+        <div class="drafts-empty-icon">📝</div>
         <p>No saved drafts yet.<br/>Generate captions and tap Save Draft.</p>
       </div>
       <div class="drafts-list" id="drafts-list"></div>
@@ -322,8 +325,23 @@
         <div class="sync-status hidden" id="manual-status"></div>
       </div>
 
-      <button class="btn-secondary" id="btn-settings-back">← Back</button>
     </section>
+
+    <!-- Bottom Tab Bar -->
+    <nav class="tab-bar hidden" id="tab-bar">
+      <button class="tab-btn active" data-tab="create" id="tab-btn-create">
+        <span class="tab-icon">✦</span>
+        <span class="tab-label">Create</span>
+      </button>
+      <button class="tab-btn" data-tab="drafts" id="tab-btn-drafts">
+        <span class="tab-icon">📅</span>
+        <span class="tab-label">Drafts</span>
+      </button>
+      <button class="tab-btn" data-tab="settings" id="tab-btn-settings">
+        <span class="tab-icon">⚙</span>
+        <span class="tab-label">Settings</span>
+      </button>
+    </nav>
 
   </div>
 

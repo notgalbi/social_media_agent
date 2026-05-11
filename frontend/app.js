@@ -371,6 +371,8 @@ function launchConfetti() {
 }
 
 // ── Animated screen transitions ──
+const CREATE_SCREENS = new Set(["screen-upload","screen-captions","screen-loading","screen-success"]);
+
 function showScreen(id) {
   playSound("swipe");
   document.querySelectorAll(".screen").forEach(s => {
@@ -383,6 +385,7 @@ function showScreen(id) {
   next.classList.remove("enter");
   void next.offsetWidth;
   next.classList.add("enter");
+  if (CREATE_SCREENS.has(id)) lastCreateScreen = id;
 }
 
 const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
@@ -576,8 +579,17 @@ document.getElementById("btn-try-now").addEventListener("click", () => {
   });
 })();
 
+let activeTab = "create";
+let lastCreateScreen = "screen-upload";
+
+function setActiveTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+}
+
 function enterApp(username) {
   document.getElementById("main-header").classList.remove("hidden");
+  document.getElementById("tab-bar").classList.remove("hidden");
   const pill = document.getElementById("user-pill");
   const connectedName = document.getElementById("connected-name");
 
@@ -585,13 +597,31 @@ function enterApp(username) {
     pill.textContent = `⚡ @${username}`;
     pill.classList.remove("hidden");
     connectedName.textContent = `@${username}`;
-    // show connected state in settings
     document.getElementById("setup-connect").classList.add("hidden");
     document.getElementById("setup-connected").classList.remove("hidden");
   }
 
   showScreen("screen-upload");
+  setActiveTab("create");
 }
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+    setActiveTab(tab);
+    if (tab === "create") {
+      showScreen(lastCreateScreen);
+    } else if (tab === "drafts") {
+      renderCalendar();
+      renderDrafts();
+      showScreen("screen-drafts");
+    } else if (tab === "settings") {
+      showScreen("screen-settings");
+      loadSettingsData();
+    }
+    playSound("click");
+  });
+});
 
 initApp();
 
@@ -1183,68 +1213,37 @@ captionEdit.addEventListener("input", () => {
   if (capText) capText.textContent = " " + captionEdit.value;
 });
 
-// Post via Buffer or copy to clipboard
+function openInstagram() {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = "instagram://";
+    setTimeout(() => window.open("https://www.instagram.com", "_blank"), 900);
+  } else {
+    window.open("https://www.instagram.com", "_blank");
+  }
+}
+
+// Post — copies caption and opens Instagram
 btnPost.addEventListener("click", async () => {
   const caption = captionEdit.value.trim();
   if (!caption) return;
 
-  // check if Buffer is connected
-  let bufferConnected = false;
+  // Copy caption to clipboard first
   try {
-    const check = await fetch(`${API_URL}/settings/buffer`);
-    const data = await check.json();
-    bufferConnected = data.connected;
-  } catch {}
-
-  if (bufferConnected && selectedFiles.length) {
-    btnPost.disabled = true;
-    btnPost.textContent = "Posting...";
-    try {
-      // upload the media file first
-      const formData = new FormData();
-      formData.append("file", selectedFiles[0]);
-      const uploadRes = await fetch(`${API_URL}/upload-media`, {
-        method: "POST",
-        body: formData,
-      });
-      const { filename } = await uploadRes.json();
-
-      // post to Instagram via Buffer
-      const postRes = await fetch(`${API_URL}/post`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption, image_filename: filename }),
-      });
-
-      if (!postRes.ok) {
-        const err = await postRes.json();
-        throw new Error(err.detail || "Post failed");
-      }
-
-      playSound("success");
-      showScreen("screen-success");
-      launchConfetti();
-    } catch (err) {
-      alert(`Could not post: ${err.message}`);
-    } finally {
-      btnPost.disabled = false;
-      btnPost.textContent = "Post to Instagram";
-    }
-  } else {
-    // fallback: copy to clipboard
-    try {
-      await navigator.clipboard.writeText(caption);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = caption;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-    showScreen("screen-success");
-    launchConfetti();
+    await navigator.clipboard.writeText(caption);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = caption;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
   }
+
+  playSound("success");
+  showScreen("screen-success");
+  launchConfetti();
+  openInstagram();
 });
 
 // Back button
@@ -1413,23 +1412,74 @@ function loadDraft(draft) {
 
 document.getElementById("btn-save-draft").addEventListener("click", saveCurrentDraft);
 
-document.getElementById("btn-drafts").addEventListener("click", () => {
-  renderDrafts();
-  showScreen("screen-drafts");
+// ── Calendar ──
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function renderCalendar() {
+  const labelEl = document.getElementById("calendar-month-label");
+  const gridEl = document.getElementById("calendar-grid");
+  if (!labelEl || !gridEl) return;
+
+  labelEl.textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
+  gridEl.innerHTML = "";
+
+  const drafts = getDrafts();
+  const draftDates = new Set();
+  drafts.forEach(d => {
+    if (d.scheduledFor) draftDates.add(d.scheduledFor.slice(0, 10));
+    if (d.createdAt) draftDates.add(d.createdAt.slice(0, 10));
+  });
+
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  ["Su","Mo","Tu","We","Th","Fr","Sa"].forEach(d => {
+    const el = document.createElement("div");
+    el.className = "cal-day-header";
+    el.textContent = d;
+    gridEl.appendChild(el);
+  });
+
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement("div");
+    el.className = "cal-day empty";
+    gridEl.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const isToday = today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === d;
+    const hasDraft = draftDates.has(dateStr);
+
+    const el = document.createElement("div");
+    el.className = "cal-day" + (isToday ? " today" : "") + (hasDraft ? " has-draft" : "");
+    el.innerHTML = `<span class="cal-day-num">${d}</span>${hasDraft ? '<span class="cal-dot"></span>' : ""}`;
+    gridEl.appendChild(el);
+  }
+}
+
+document.getElementById("cal-prev")?.addEventListener("click", () => {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+  playSound("click");
 });
 
-document.getElementById("btn-drafts-back").addEventListener("click", () => {
-  showScreen("screen-upload");
+document.getElementById("cal-next")?.addEventListener("click", () => {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+  playSound("click");
 });
 
 // --- Settings ---
 
-const btnSettings     = document.getElementById("btn-settings");
-const btnSettingsBack = document.getElementById("btn-settings-back");
 const btnSaveCaptions = document.getElementById("btn-save-captions");
 const manualCaptions  = document.getElementById("manual-captions");
 const manualStatus    = document.getElementById("manual-status");
-const syncStatus      = document.getElementById("sync-status");
 const setupConnect    = document.getElementById("setup-connect");
 const setupConnected  = document.getElementById("setup-connected");
 const connectedName   = document.getElementById("connected-name");
@@ -1459,15 +1509,12 @@ function showDisconnected() {
   setupConnect.classList.remove("hidden");
 }
 
-btnSettings.addEventListener("click", async () => {
-  showScreen("screen-settings");
+async function loadSettingsData() {
   try {
     const res = await fetch(`${API_URL}/settings/captions`);
     const data = await res.json();
     if (data.captions?.length) manualCaptions.value = data.captions.join("\n");
   } catch {}
-
-  // refresh connection status
   try {
     const res = await fetch(`${API_URL}/auth/status`);
     const data = await res.json();
@@ -1480,15 +1527,14 @@ btnSettings.addEventListener("click", async () => {
       document.getElementById("setup-connected").classList.add("hidden");
     }
   } catch {}
-});
-
-btnSettingsBack.addEventListener("click", () => showScreen("screen-upload"));
+}
 
 document.getElementById("btn-disconnect").addEventListener("click", async () => {
   await fetch(`${API_URL}/auth/logout`, { method: "POST" });
   document.getElementById("user-pill").classList.add("hidden");
   document.getElementById("setup-connect").classList.remove("hidden");
   document.getElementById("setup-connected").classList.add("hidden");
+  setActiveTab("create");
   showScreen("screen-upload");
 });
 
