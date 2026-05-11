@@ -315,6 +315,20 @@ def save_store(data: dict):
 # --- Pydantic models ---
 
 
+class SongSuggestion(BaseModel):
+    artist: str
+    song: str
+
+
+class CaptionOutput(BaseModel):
+    caption_1: str
+    caption_2: str
+    caption_3: str
+    music_1: list[SongSuggestion]
+    music_2: list[SongSuggestion]
+    music_3: list[SongSuggestion]
+
+
 class CaptionsPayload(BaseModel):
     captions: list[str]
 
@@ -458,28 +472,6 @@ def generate_content(media_parts: list, num_source_files: int = 1, tones: str = 
         tag_plural = "s" if hashtag_count > 1 else ""
         hashtag_instruction = f"End each caption with exactly {hashtag_count} niche-aware hashtag{tag_plural} on a new line — no more, no less."
 
-    song_schema = {
-        "type": "object",
-        "properties": {
-            "artist": {"type": "string"},
-            "song": {"type": "string"},
-        },
-        "required": ["artist", "song"],
-    }
-    music_array = {"type": "array", "items": song_schema}
-    response_schema = {
-        "type": "object",
-        "properties": {
-            "caption_1": {"type": "string"},
-            "caption_2": {"type": "string"},
-            "caption_3": {"type": "string"},
-            "music_1": music_array,
-            "music_2": music_array,
-            "music_3": music_array,
-        },
-        "required": ["caption_1", "caption_2", "caption_3", "music_1", "music_2", "music_3"],
-    }
-
     parts.append(
         f"{image_context} Write 3 Instagram captions. "
         "Match the creator's voice exactly if example captions are provided.\n\n"
@@ -499,9 +491,9 @@ def generate_content(media_parts: list, num_source_files: int = 1, tones: str = 
         "gemini-2.5-flash",
         system_instruction=system,
         generation_config=genai.GenerationConfig(
-            max_output_tokens=1600,
+            max_output_tokens=8192,
             response_mime_type="application/json",
-            response_schema=response_schema,
+            response_schema=CaptionOutput,
         ),
     )
 
@@ -509,16 +501,12 @@ def generate_content(media_parts: list, num_source_files: int = 1, tones: str = 
     response = gemini_model.generate_content(parts)
     duration = time.perf_counter() - start_time
 
-    data = json.loads(response.text)
-    captions = [
-        data.get("caption_1", ""),
-        data.get("caption_2", ""),
-        data.get("caption_3", ""),
-    ]
+    out = CaptionOutput.model_validate_json(response.text)
+    captions = [out.caption_1, out.caption_2, out.caption_3]
     music = {
-        "1": data.get("music_1", []),
-        "2": data.get("music_2", []),
-        "3": data.get("music_3", []),
+        "1": [s.model_dump() for s in out.music_1],
+        "2": [s.model_dump() for s in out.music_2],
+        "3": [s.model_dump() for s in out.music_3],
     }
 
     usage = response.usage_metadata
