@@ -535,7 +535,7 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     )
 
     gemini_model = genai.GenerativeModel(
-        "gemini-2.0-flash",
+        "gemini-1.5-flash",
         system_instruction=system,
         generation_config=genai.GenerationConfig(max_output_tokens=1400),
     )
