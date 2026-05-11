@@ -188,6 +188,46 @@ TONE_GUIDES = {
         "Language examples: 'criminally good. no notes.' / 'this changed my life a little bit' / 'ate this in complete silence out of respect' / 'it's giving michelin star and i'm not okay' / 'the way this slapped differently today' / 'no crumbs were left. none.'.\n"
         "Emojis: 🍽️ 🧄 🫶 ✨ (flavor only)"
     ),
+    "cinematic": (
+        "TONE — Cinematic:\n"
+        "Style: dramatic, filmic, visual storytelling. Like a movie still caption. Short, atmospheric, directorial gaze.\n"
+        "Gen Z language patterns: 'this is a film' / 'it's giving movie scene' / 'cinematic universe' / 'the director's cut'\n"
+        "Reference energy: film photography, short film captions, editorial fashion, dark academia cinema.\n"
+        "Language examples: 'the scene writes itself' / 'this needed a soundtrack' / 'directed by the universe' / 'cut to this' / 'the b-roll that saved the film'.\n"
+        "Emojis: 🎬 🎞️ 🖤 (rare, deliberate)"
+    ),
+    "luxury": (
+        "TONE — Luxury:\n"
+        "Style: quiet luxury, elevated, aspirational but not flashy. Old money energy. Less is more.\n"
+        "Gen Z language patterns: 'quiet luxury era' / 'old money aesthetic' / 'the standards are high' / 'understated everything'\n"
+        "Reference energy: quiet luxury TikTok, old money aesthetic, European editorial, Loro Piana energy.\n"
+        "Language examples: 'the details are everything' / 'effortless and intentional' / 'this is the standard' / 'money doesn't talk here' / 'quiet luxury is the only luxury'.\n"
+        "Emojis: minimal or none — at most 🤍 🫧"
+    ),
+    "soft": (
+        "TONE — Soft:\n"
+        "Style: gentle, nurturing, tender. Soft-girl energy. Safe, warm, comforting captions.\n"
+        "Gen Z language patterns: 'soft life era' / 'gentle with myself' / 'cozy season' / 'healing quietly' / 'being kind to myself'\n"
+        "Reference energy: soft-girl TikTok, slow mornings, comfort content, gentle living creators.\n"
+        "Language examples: 'choosing peace today' / 'soft mornings heal me' / 'being gentle with it all' / 'rest is productive too' / 'tender days like this'.\n"
+        "Emojis: 🌸 🤍 🫶 ☁️"
+    ),
+    "chaotic": (
+        "TONE — Chaotic:\n"
+        "Style: unhinged, chaotic good, gremlin energy. Unpredictable, fast, funny-dark.\n"
+        "Gen Z language patterns: 'no thoughts head empty' / 'i am so normal about this' / 'the chaos was planned' / 'villain arc activated'\n"
+        "Reference energy: Twitter brain rot, chaotic TikTok, goblin mode, unwell-but-make-it-art.\n"
+        "Language examples: 'the chaos was planned. kind of.' / 'fully unhinged and at peace with it' / 'no thoughts just vibes and poor decisions' / 'the villain origin story continues' / 'we do not explain ourselves here'.\n"
+        "Emojis: 😭 💀 🫠 🔥"
+    ),
+    "mysterious": (
+        "TONE — Mysterious:\n"
+        "Style: cryptic, intriguing, dark allure. Makes people stop and re-read. Withholds more than it reveals.\n"
+        "Gen Z language patterns: 'something shifted' / 'you wouldn't understand' / 'the lore deepens' / 'not everything needs to be explained'\n"
+        "Reference energy: dark academia mystery, tarot aesthetic, alt-indie creators, cryptic fashion editorial.\n"
+        "Language examples: 'something shifted and i can feel it' / 'not everything is meant to be explained' / 'the lore is expanding' / 'i know things' / 'we don't talk about it'.\n"
+        "Emojis: 🌙 🖤 🫥 (sparse, atmospheric)"
+    ),
     "auto": (
         "TONE — Auto:\n"
         "Analyze the image/content first. Choose the most believable social tone automatically. "
@@ -198,7 +238,7 @@ TONE_GUIDES = {
 
 def get_length_guide(level: int) -> str:
     guides = {
-        1: "LENGTH (CRITICAL): Every caption = exactly 1 line of text before hashtags. One tight, punchy thought. If it's longer, cut it.",
+        1: "LENGTH (CRITICAL): Every caption = as short as 3 words up to 1 short line before hashtags. One tight, punchy thought. If it's longer, cut it.",
         2: "LENGTH (CRITICAL): Every caption = 1–2 lines of text before hashtags. Short and deliberate. Cut any word that doesn't earn its place.",
         3: "LENGTH (CRITICAL): Every caption = 3–4 lines of text before hashtags. Hook + one real thought.",
         4: "LENGTH (CRITICAL): Every caption = 5–6 lines of text before hashtags. Room for emotion, context, and depth.",
@@ -211,6 +251,50 @@ def get_hashtag_guide(count: int) -> str:
     if count == 0:
         return "HASHTAGS (CRITICAL): Do NOT include any hashtags whatsoever in any caption. Zero hashtags. End every caption without them."
     return f"HASHTAGS (CRITICAL): End every caption with EXACTLY {count} relevant, niche-aware hashtag{'s' if count > 1 else ''} on a new line. Not {count - 1}, not {count + 1} — exactly {count}."
+
+
+def get_tone_guide(tones_str: str) -> str:
+    parts = [t.strip().lower() for t in tones_str.split(",") if t.strip()]
+    valid = [t for t in parts if t in TONE_GUIDES and t != "auto"]
+    if not valid:
+        return TONE_GUIDES["auto"]
+    if len(valid) == 1:
+        return TONE_GUIDES[valid[0]]
+    blended = "\n\n".join(TONE_GUIDES[t] for t in valid)
+    return "TONE BLEND — Combine these styles naturally. Don't alternate — merge them:\n\n" + blended
+
+
+def get_genre_guide(genres_str: str, music_vibe: str = "") -> str:
+    parts = [g.strip().lower() for g in genres_str.split(",") if g.strip()]
+    genres = [g for g in parts if g != "auto"]
+    vibe_part = f" The music should also feel like: '{music_vibe}'." if music_vibe else ""
+    if not genres:
+        return f"MUSIC GENRE: Choose genre matching caption energy.{vibe_part}"
+    if len(genres) == 1:
+        label = GENRE_LABELS.get(genres[0], genres[0])
+        return f"MUSIC GENRE: All 9 songs must be {label} genre.{vibe_part}"
+    labels = [GENRE_LABELS.get(g, g) for g in genres]
+    labels_str = " / ".join(labels)
+    return f"MUSIC GENRE: Mix these genres across the 9 suggestions: {labels_str}.{vibe_part}"
+
+
+def get_emoji_guide(style: str, intensity: int) -> str:
+    intensity_map = {
+        0: "EMOJIS: Use zero emojis in any caption.",
+        1: "EMOJIS: Use 0–1 emoji per caption — only if essential.",
+        2: "EMOJIS: Use 1–3 emojis per caption, placed intentionally.",
+        3: "EMOJIS: Use 3–6 emojis per caption with energy.",
+    }
+    base = intensity_map.get(intensity, intensity_map[2])
+    if style:
+        base = base + f" Preferred emoji style: {style}"
+    return base
+
+
+def get_custom_phrase_guide(phrases: str) -> str:
+    if not phrases or not phrases.strip():
+        return ""
+    return f"\n\nCUSTOM PHRASES (weave in naturally where they fit): {phrases}"
 
 
 # --- Store helpers ---
@@ -380,34 +464,25 @@ GENRE_LABELS = {
     "country": "Country / Folk",
     "latin": "Latin / Reggaeton",
     "kpop": "K-Pop",
+    "house": "House / Deep House",
+    "afrobeats": "Afrobeats",
+    "lofi": "Lo-fi / Ambient",
+    "jazz": "Jazz / Neo-Soul",
+    "indiepop": "Indie Pop",
+    "hyperpop": "Hyperpop",
 }
 
 
-def generate_content(
-    image_b64_list: list[str],
-    media_type: str = "image/jpeg",
-    num_source_files: int = 1,
-    tone: str = "auto",
-    length_level: int = 2,
-    hashtag_count: int = 5,
-    music_genre: str = "auto",
-) -> dict:
+def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tones: str = "", length_level: int = 2, hashtag_count: int = 5, music_genres: str = "auto", music_vibe: str = "", custom_phrases: str = "", emoji_style: str = "", emoji_intensity: int = 2) -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
-    tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["auto"])
+    tone_guide = get_tone_guide(tones)
     length_guide = get_length_guide(length_level)
-    hashtag_guide = get_hashtag_guide(hashtag_count)
-    genre_label = GENRE_LABELS.get(music_genre)
-    genre_guide = (
-        f"MUSIC GENRE: Suggest only {genre_label} songs. All 9 music suggestions must be {genre_label} tracks."
-        if genre_label
-        else "MUSIC GENRE: Choose the genre that best matches the caption's energy and visual mood."
-    )
-    system = (
-        BRAND_CONTEXT
-        + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{genre_guide}"
-        + style_block
-    )
+    hashtag_guide = get_hashtag_guide(min(hashtag_count, 5))
+    genre_guide = get_genre_guide(music_genres, music_vibe)
+    emoji_guide = get_emoji_guide(emoji_style, emoji_intensity)
+    phrase_guide = get_custom_phrase_guide(custom_phrases)
+    system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{emoji_guide}\n{genre_guide}{phrase_guide}" + style_block
 
     content = []
     for img_b64 in image_b64_list:
@@ -484,7 +559,11 @@ def generate_content(
 
     log_data = {
         "event": "generate_content",
-        "tone": tone,
+        "tones": tones,
+        "music_genres": music_genres,
+        "music_vibe": music_vibe,
+        "emoji_style": emoji_style,
+        "emoji_intensity": emoji_intensity,
         "num_source_files": num_source_files,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
@@ -507,13 +586,7 @@ def generate_content(
 
 
 @app.post("/generate-captions")
-async def generate_captions_endpoint(
-    files: list[UploadFile] = File(...),
-    tone: str = Form("auto"),
-    length_level: int = Form(2),
-    hashtag_count: int = Form(5),
-    music_genre: str = Form("auto"),
-):
+async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones: str = Form(""), length_level: int = Form(2), hashtag_count: int = Form(3), music_genres: str = Form("auto"), music_vibe: str = Form(""), custom_phrases: str = Form(""), emoji_style: str = Form(""), emoji_intensity: int = Form(2)):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
@@ -551,31 +624,24 @@ async def generate_captions_endpoint(
     if not all_frames:
         raise HTTPException(status_code=400, detail="No supported files found")
 
+    hashtag_count = min(hashtag_count, 5)
     start_time = time.perf_counter()
-    log.info(
-        json.dumps(
-            {
-                "event": "generate_captions_start",
-                "num_files": len(files),
-                "num_frames": len(all_frames),
-                "tone": tone,
-                "length_level": length_level,
-                "hashtag_count": hashtag_count,
-                "music_genre": music_genre,
-            }
-        )
-    )
+    log.info(json.dumps({
+        "event": "generate_captions_start",
+        "num_files": len(files),
+        "num_frames": len(all_frames),
+        "tones": tones,
+        "length_level": length_level,
+        "hashtag_count": hashtag_count,
+        "music_genres": music_genres,
+        "music_vibe": music_vibe,
+        "custom_phrases": custom_phrases,
+        "emoji_style": emoji_style,
+        "emoji_intensity": emoji_intensity,
+    }))
 
     try:
-        result = generate_content(
-            all_frames,
-            last_media_type,
-            num_source_files=len(files),
-            tone=tone,
-            length_level=length_level,
-            hashtag_count=hashtag_count,
-            music_genre=music_genre,
-        )
+        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tones=tones, length_level=length_level, hashtag_count=hashtag_count, music_genres=music_genres, music_vibe=music_vibe, custom_phrases=custom_phrases, emoji_style=emoji_style, emoji_intensity=emoji_intensity)
         duration = time.perf_counter() - start_time
         log.info(
             json.dumps(

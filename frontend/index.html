@@ -47,6 +47,7 @@
     <header class="header hidden" id="main-header">
       <div class="logo">Captionly</div>
       <div class="user-pill hidden" id="user-pill"></div>
+      <button class="btn-drafts" id="btn-drafts" title="Saved Drafts">📋</button>
       <button class="btn-settings" id="btn-settings">⚙</button>
     </header>
 
@@ -65,8 +66,8 @@
       </div>
       <div class="tone-selector" id="tone-selector">
         <div class="tone-label">Caption Vibe</div>
+        <input type="text" class="pill-search" id="vibe-search" placeholder="Search vibes..." />
         <div class="tone-pills">
-          <button class="tone-pill active" data-tone="auto">✨ Auto</button>
           <button class="tone-pill" data-tone="aesthetic">🌸 Aesthetic</button>
           <button class="tone-pill" data-tone="bold">🔥 Bold</button>
           <button class="tone-pill" data-tone="relatable">😭 Relatable</button>
@@ -78,6 +79,11 @@
           <button class="tone-pill" data-tone="hustle">💼 Hustle</button>
           <button class="tone-pill" data-tone="moody">🌙 Moody</button>
           <button class="tone-pill" data-tone="foodie">🍽️ Foodie</button>
+          <button class="tone-pill" data-tone="cinematic">🎬 Cinematic</button>
+          <button class="tone-pill" data-tone="luxury">🤍 Luxury</button>
+          <button class="tone-pill" data-tone="soft">☁️ Soft</button>
+          <button class="tone-pill" data-tone="chaotic">💀 Chaotic</button>
+          <button class="tone-pill" data-tone="mysterious">🌙 Mysterious</button>
         </div>
       </div>
 
@@ -95,12 +101,13 @@
           <span class="tone-label">Hashtags</span>
           <span class="slider-val" id="hashtag-val-label">5 tags</span>
         </div>
-        <input type="range" class="caption-slider" id="hashtag-slider" min="0" max="10" step="1" value="5" />
-        <div class="slider-ticks"><span>None</span><span>10</span></div>
+        <input type="range" class="caption-slider" id="hashtag-slider" min="0" max="5" step="1" value="3" />
+        <div class="slider-ticks"><span>None</span><span>5</span></div>
       </div>
 
       <div class="tone-selector" id="genre-selector">
         <div class="tone-label">Music Genre</div>
+        <input type="text" class="pill-search" id="genre-search" placeholder="Search genres..." />
         <div class="tone-pills">
           <button class="tone-pill genre-pill active" data-genre="auto">🎵 Auto</button>
           <button class="tone-pill genre-pill" data-genre="pop">🎤 Pop</button>
@@ -112,6 +119,39 @@
           <button class="tone-pill genre-pill" data-genre="country">🤠 Country</button>
           <button class="tone-pill genre-pill" data-genre="latin">🔥 Latin</button>
           <button class="tone-pill genre-pill" data-genre="kpop">✨ K-Pop</button>
+          <button class="tone-pill genre-pill" data-genre="house">🏠 House</button>
+          <button class="tone-pill genre-pill" data-genre="afrobeats">🌍 Afrobeats</button>
+          <button class="tone-pill genre-pill" data-genre="lofi">🎵 Lo-fi</button>
+          <button class="tone-pill genre-pill" data-genre="jazz">🎷 Jazz</button>
+          <button class="tone-pill genre-pill" data-genre="indiepop">🎸 Indie Pop</button>
+          <button class="tone-pill genre-pill" data-genre="hyperpop">⚡ Hyperpop</button>
+        </div>
+        <div class="music-vibe-input-wrap">
+          <input type="text" class="music-vibe-input" id="music-vibe-input" placeholder="Music vibe... late night drive, gym energy, rooftop party" />
+        </div>
+      </div>
+
+      <div class="custom-section">
+        <div class="tone-label">Your Phrases</div>
+        <textarea class="custom-phrases-input" id="custom-phrases-input" rows="2" placeholder="lore accurate, soft launch, this healed me, understood the assignment..."></textarea>
+      </div>
+
+      <div class="emoji-section">
+        <div class="tone-label">Emoji Style</div>
+        <div class="emoji-presets">
+          <button class="emoji-preset" data-style="" data-intensity="0">None</button>
+          <button class="emoji-preset" data-style="✨ 🖤" data-intensity="1">Minimal</button>
+          <button class="emoji-preset" data-style="🌸 🫧 🤍" data-intensity="2">Soft</button>
+          <button class="emoji-preset" data-style="🔥 🫶 👑" data-intensity="2">Hype</button>
+          <button class="emoji-preset" data-style="😭 💀 🫠" data-intensity="3">Chaotic</button>
+        </div>
+        <div class="slider-group" style="margin-top:8px">
+          <div class="slider-label-row">
+            <span class="tone-label">Intensity</span>
+            <span class="slider-val" id="emoji-val-label">Moderate</span>
+          </div>
+          <input type="range" class="caption-slider" id="emoji-slider" min="0" max="3" step="1" value="2" />
+          <div class="slider-ticks"><span>None</span><span>Max</span></div>
         </div>
       </div>
 
@@ -212,6 +252,7 @@
         <label class="edit-label">Edit before posting</label>
         <textarea id="caption-edit" rows="4"></textarea>
         <button class="btn-primary" id="btn-post">Post to Instagram</button>
+        <button class="btn-secondary btn-save-draft" id="btn-save-draft">Save Draft</button>
         <button class="btn-secondary" id="btn-back">← Try Again</button>
       </div>
     </section>
@@ -224,6 +265,19 @@
         <p>Your caption is copied to clipboard. Paste it when posting to Instagram.</p>
         <button class="btn-primary" id="btn-new">New Post</button>
       </div>
+    </section>
+
+    <!-- Drafts Screen -->
+    <section class="screen hidden" id="screen-drafts">
+      <div class="drafts-header">
+        <h2 class="section-title">Saved Drafts</h2>
+        <button class="btn-drafts-back" id="btn-drafts-back">✕</button>
+      </div>
+      <div class="drafts-empty hidden" id="drafts-empty">
+        <div class="drafts-empty-icon">📋</div>
+        <p>No saved drafts yet.<br/>Generate captions and tap Save Draft.</p>
+      </div>
+      <div class="drafts-list" id="drafts-list"></div>
     </section>
 
     <!-- Settings Screen -->

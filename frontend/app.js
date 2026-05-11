@@ -389,29 +389,82 @@ const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];
 
 let selectedFiles = [];
 let selectedCaption = "";
-let selectedTone = "auto";
+let selectedTones = new Set(); // empty = auto
 let selectedLengthLevel = 2;
-let selectedHashtagCount = 5;
-let selectedMusicGenre = "auto";
+let selectedHashtagCount = 3;
+let selectedGenres = new Set(["auto"]);
+let musicVibe = "";
+let customPhrases = "";
+let emojiStyle = "";
+let emojiIntensity = 2;
 
-// Tone pill selection
+// Vibe pill multi-select
 document.querySelectorAll(".tone-pill:not(.genre-pill)").forEach(pill => {
   pill.addEventListener("click", () => {
-    document.querySelectorAll(".tone-pill:not(.genre-pill)").forEach(p => p.classList.remove("active"));
-    pill.classList.add("active");
-    selectedTone = pill.dataset.tone;
+    pill.classList.toggle("active");
+    if (pill.classList.contains("active")) {
+      selectedTones.add(pill.dataset.tone);
+    } else {
+      selectedTones.delete(pill.dataset.tone);
+    }
     playSound("click");
   });
 });
 
-// Genre pill selection
+// Vibe search filter
+document.getElementById("vibe-search").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll(".tone-pill:not(.genre-pill)").forEach(pill => {
+    const label = pill.textContent.toLowerCase();
+    pill.style.display = !q || label.includes(q) ? "" : "none";
+  });
+});
+
+// Genre pill multi-select
 document.querySelectorAll(".genre-pill").forEach(pill => {
   pill.addEventListener("click", () => {
-    document.querySelectorAll(".genre-pill").forEach(p => p.classList.remove("active"));
-    pill.classList.add("active");
-    selectedMusicGenre = pill.dataset.genre;
+    const genre = pill.dataset.genre;
+    if (genre === "auto") {
+      selectedGenres.clear();
+      selectedGenres.add("auto");
+      document.querySelectorAll(".genre-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+    } else {
+      selectedGenres.delete("auto");
+      document.querySelector(".genre-pill[data-genre='auto']").classList.remove("active");
+      if (selectedGenres.has(genre)) {
+        selectedGenres.delete(genre);
+        pill.classList.remove("active");
+        if (selectedGenres.size === 0) {
+          selectedGenres.add("auto");
+          document.querySelector(".genre-pill[data-genre='auto']").classList.add("active");
+        }
+      } else {
+        selectedGenres.add(genre);
+        pill.classList.add("active");
+      }
+    }
     playSound("click");
   });
+});
+
+// Genre search filter
+document.getElementById("genre-search").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll(".genre-pill").forEach(pill => {
+    const label = pill.textContent.toLowerCase();
+    pill.style.display = !q || label.includes(q) ? "" : "none";
+  });
+});
+
+// Music vibe input
+document.getElementById("music-vibe-input").addEventListener("input", e => {
+  musicVibe = e.target.value;
+});
+
+// Custom phrases
+document.getElementById("custom-phrases-input").addEventListener("input", e => {
+  customPhrases = e.target.value;
 });
 
 // Length slider
@@ -435,11 +488,38 @@ const hashtagValLabel = document.getElementById("hashtag-val-label");
 function updateHashtagSlider() {
   selectedHashtagCount = parseInt(hashtagSlider.value);
   hashtagValLabel.textContent = selectedHashtagCount === 0 ? "None" : `${selectedHashtagCount} tags`;
-  const pct = (selectedHashtagCount / 10) * 100;
+  const pct = (selectedHashtagCount / 5) * 100;
   hashtagSlider.style.setProperty("--fill", pct + "%");
 }
 hashtagSlider.addEventListener("input", updateHashtagSlider);
 updateHashtagSlider();
+
+// Emoji presets
+document.querySelectorAll(".emoji-preset").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".emoji-preset").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    emojiStyle = btn.dataset.style;
+    emojiIntensity = parseInt(btn.dataset.intensity);
+    const emojiSliderEl = document.getElementById("emoji-slider");
+    emojiSliderEl.value = emojiIntensity;
+    updateEmojiSlider();
+    playSound("click");
+  });
+});
+
+const EMOJI_INTENSITY_LABELS = { 0: "None", 1: "Minimal", 2: "Moderate", 3: "Expressive" };
+const emojiSlider = document.getElementById("emoji-slider");
+const emojiValLabel = document.getElementById("emoji-val-label");
+
+function updateEmojiSlider() {
+  emojiIntensity = parseInt(emojiSlider.value);
+  emojiValLabel.textContent = EMOJI_INTENSITY_LABELS[emojiIntensity];
+  const pct = (emojiIntensity / 3) * 100;
+  emojiSlider.style.setProperty("--fill", pct + "%");
+}
+emojiSlider.addEventListener("input", updateEmojiSlider);
+updateEmojiSlider();
 
 // Keep backend warm
 setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
@@ -657,20 +737,27 @@ async function generateCaptions() {
 
   const formData = new FormData();
   selectedFiles.forEach(f => formData.append("files", f));
-  formData.append("tone", selectedTone);
+  formData.append("tones", Array.from(selectedTones).join(","));
   formData.append("length_level", selectedLengthLevel);
   formData.append("hashtag_count", selectedHashtagCount);
-  formData.append("music_genre", selectedMusicGenre);
+  formData.append("music_genres", Array.from(selectedGenres).join(","));
+  formData.append("music_vibe", musicVibe);
+  formData.append("custom_phrases", customPhrases);
+  formData.append("emoji_style", emojiStyle);
+  formData.append("emoji_intensity", emojiIntensity);
 
   const loaderText = document.getElementById("loader-text");
   const isCarousel = selectedFiles.length > 1;
   const toneLabelMap = {
-    auto: "the vibe", aesthetic: "the aesthetic", bold: "bold energy",
+    aesthetic: "the aesthetic", bold: "bold energy",
     relatable: "the feels", romantic: "the romance", motivational: "the motivation",
     wanderlust: "wanderlust", funny: "the humor", earthy: "the earthy vibe",
     hustle: "hustle mode", moody: "the mood", foodie: "the dish",
+    cinematic: "the cinematic vibe", luxury: "the luxury aesthetic",
+    soft: "soft energy", chaotic: "the chaos", mysterious: "the mystery",
   };
-  const toneLabel = toneLabelMap[selectedTone] || "the vibe";
+  const firstTone = Array.from(selectedTones)[0];
+  const toneLabel = (firstTone && toneLabelMap[firstTone]) || "the vibe";
   const messages = [
     "Reading your content...",
     isCarousel ? `Analyzing ${selectedFiles.length} photos...` : "Catching the aesthetic...",
@@ -1181,6 +1268,159 @@ btnNew.addEventListener("click", () => {
   trimAudio.pause(); trimAudio.src = "";
   if (selectedMusicCardEl) { selectedMusicCardEl.classList.remove("preview-selected"); selectedMusicCardEl = null; }
   previewMusicUrl = null;
+  showScreen("screen-upload");
+});
+
+// ── Draft management ──
+function getDrafts() {
+  try { return JSON.parse(localStorage.getItem("captionly_drafts") || "[]"); } catch { return []; }
+}
+function saveDrafts(drafts) {
+  localStorage.setItem("captionly_drafts", JSON.stringify(drafts));
+}
+
+async function saveCurrentDraft() {
+  const caption = captionEdit.value.trim();
+  if (!caption) return;
+
+  let imageThumb = "";
+  if (selectedFiles.length) {
+    try {
+      imageThumb = await fileToThumb(selectedFiles[0]);
+    } catch {}
+  }
+
+  const draft = {
+    id: Date.now().toString(),
+    caption,
+    imageThumb,
+    tones: Array.from(selectedTones),
+    genres: Array.from(selectedGenres),
+    status: "draft",
+    createdAt: new Date().toISOString(),
+    scheduledFor: null,
+    notes: "",
+  };
+
+  const drafts = getDrafts();
+  drafts.unshift(draft);
+  saveDrafts(drafts);
+
+  const btn = document.getElementById("btn-save-draft");
+  const orig = btn.textContent;
+  btn.textContent = "✓ Saved";
+  setTimeout(() => btn.textContent = orig, 2000);
+  playSound("success");
+}
+
+async function fileToThumb(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = 80;
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const ratio = Math.max(size / img.width, size / img.height);
+        const w = img.width * ratio, h = img.height * ratio;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.6));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const STATUS_CYCLE = ["draft", "ready", "scheduled", "posted"];
+const STATUS_LABELS = { draft: "Draft", ready: "Ready", scheduled: "Scheduled", posted: "Posted" };
+
+function renderDrafts() {
+  const drafts = getDrafts();
+  const listEl = document.getElementById("drafts-list");
+  const emptyEl = document.getElementById("drafts-empty");
+  listEl.innerHTML = "";
+
+  if (!drafts.length) {
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
+
+  drafts.forEach(draft => {
+    const card = document.createElement("div");
+    card.className = "draft-card";
+    const date = new Date(draft.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const snippet = draft.caption.slice(0, 80) + (draft.caption.length > 80 ? "…" : "");
+
+    card.innerHTML = `
+      <div class="draft-thumb">
+        ${draft.imageThumb ? `<img src="${draft.imageThumb}" alt="" />` : '<div class="draft-thumb-placeholder">📷</div>'}
+      </div>
+      <div class="draft-info">
+        <div class="draft-caption">${snippet}</div>
+        <div class="draft-meta">
+          <span class="draft-date">${date}</span>
+          <button class="draft-status status-${draft.status}" data-id="${draft.id}">${STATUS_LABELS[draft.status]}</button>
+        </div>
+      </div>
+      <button class="draft-delete" data-id="${draft.id}">✕</button>
+    `;
+
+    card.querySelector(".draft-info").addEventListener("click", () => loadDraft(draft));
+
+    card.querySelector(".draft-status").addEventListener("click", e => {
+      e.stopPropagation();
+      cycleDraftStatus(draft.id);
+      playSound("click");
+    });
+
+    card.querySelector(".draft-delete").addEventListener("click", e => {
+      e.stopPropagation();
+      deleteDraft(draft.id);
+      playSound("click");
+    });
+
+    listEl.appendChild(card);
+  });
+}
+
+function cycleDraftStatus(id) {
+  const drafts = getDrafts();
+  const d = drafts.find(x => x.id === id);
+  if (!d) return;
+  const idx = STATUS_CYCLE.indexOf(d.status);
+  d.status = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+  saveDrafts(drafts);
+  renderDrafts();
+}
+
+function deleteDraft(id) {
+  const drafts = getDrafts().filter(x => x.id !== id);
+  saveDrafts(drafts);
+  renderDrafts();
+}
+
+function loadDraft(draft) {
+  captionEdit.value = draft.caption;
+  selectedCaption = draft.caption;
+  document.getElementById("ig-cap-text").textContent = " " + draft.caption;
+  selectedWrap.classList.remove("hidden");
+  showScreen("screen-captions");
+}
+
+document.getElementById("btn-save-draft").addEventListener("click", saveCurrentDraft);
+
+document.getElementById("btn-drafts").addEventListener("click", () => {
+  renderDrafts();
+  showScreen("screen-drafts");
+});
+
+document.getElementById("btn-drafts-back").addEventListener("click", () => {
   showScreen("screen-upload");
 });
 
