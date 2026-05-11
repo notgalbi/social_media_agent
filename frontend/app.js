@@ -789,9 +789,7 @@ async function generateCaptions() {
     clearInterval(msgInterval);
     const msg = err.name === "AbortError"
       ? "Taking too long — try a smaller photo or video."
-      : err.message.startsWith("Server error") || err.message.length < 120
-        ? err.message
-        : "Could not reach the server. Check your connection and try again.";
+      : (err.message || "Could not reach the server. Check your connection and try again.").slice(0, 200);
     alert(msg);
     showScreen("screen-upload");
   }

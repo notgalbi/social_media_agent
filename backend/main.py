@@ -665,7 +665,11 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones:
                 "error": str(e),
             }
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        err_str = str(e)
+        # Surface Gemini API key errors clearly
+        if "api_key" in err_str.lower() or "api key" in err_str.lower() or "permission" in err_str.lower() or "credential" in err_str.lower():
+            raise HTTPException(status_code=500, detail="AI service error: invalid or missing GEMINI_API_KEY")
+        raise HTTPException(status_code=500, detail=err_str[:200])
     finally:
         for p in tmp_paths:
             try:
