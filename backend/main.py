@@ -16,7 +16,7 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 import httpx
-import google.generativeai as genai
+import anthropic
 import cv2
 from PIL import Image
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
@@ -70,7 +70,7 @@ app.add_middleware(
 
 app.mount("/media", StaticFiles(directory=str(UPLOADS_DIR)), name="media")
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 BRAND_CONTEXT = """
 You are writing captions for modern Instagram creators.
@@ -484,12 +484,12 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     phrase_guide = get_custom_phrase_guide(custom_phrases)
     system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{emoji_guide}\n{genre_guide}{phrase_guide}" + style_block
 
-    # Build image parts from base64 strings
-    parts = []
+    content = []
     for img_b64 in image_b64_list:
-        img_bytes = base64.b64decode(img_b64)
-        pil_img = Image.open(io.BytesIO(img_bytes))
-        parts.append(pil_img)
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": img_b64},
+        })
 
     if num_source_files > 1:
         image_context = (
@@ -506,50 +506,52 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
         tag_plural = "s" if hashtag_count > 1 else ""
         hashtag_instruction = f"End each caption with exactly {hashtag_count} niche-aware hashtag{tag_plural} on a new line — no more, no less."
 
-    parts.append(
-        f"{image_context} Write 3 Instagram captions. "
-        "Match the creator's voice exactly if example captions are provided.\n\n"
-        "Generate 3 distinct versions (each must match the LENGTH instruction exactly):\n"
-        "1. Vibe Caption — mood-forward, emotionally aesthetic, dreamy.\n"
-        "2. Hook Caption — POV/question/opening statement, strongest engagement potential.\n"
-        "3. Story Caption — feels personal, believable lived moment, emotional realism.\n\n"
-        "Each caption must feel like it was written by a real person — not an AI. "
-        "Use natural rhythm, sentence fragments, internet-native phrasing. "
-        f"{hashtag_instruction}\n\n"
-        "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
-        "Format your response EXACTLY as:\n"
-        "CAPTION_1: [full caption with line breaks and hashtags]\n"
-        "CAPTION_2: [full caption with line breaks and hashtags]\n"
-        "CAPTION_3: [full caption with line breaks and hashtags]\n"
-        "MUSIC_1_1: [Artist] - [Song Title]\n"
-        "MUSIC_1_2: [Artist] - [Song Title]\n"
-        "MUSIC_1_3: [Artist] - [Song Title]\n"
-        "MUSIC_2_1: [Artist] - [Song Title]\n"
-        "MUSIC_2_2: [Artist] - [Song Title]\n"
-        "MUSIC_2_3: [Artist] - [Song Title]\n"
-        "MUSIC_3_1: [Artist] - [Song Title]\n"
-        "MUSIC_3_2: [Artist] - [Song Title]\n"
-        "MUSIC_3_3: [Artist] - [Song Title]\n\n"
-        "Only suggest real songs that are currently popular and trending on Instagram Reels / TikTok — songs people are actually using right now. "
-        "Prioritize songs with viral moments, trending sounds, or high reel usage. Each caption should have distinctly different music."
-    )
-
-    gemini_model = genai.GenerativeModel(
-        "gemini-1.5-flash",
-        system_instruction=system,
-        generation_config=genai.GenerationConfig(max_output_tokens=1400),
-    )
+    content.append({
+        "type": "text",
+        "text": (
+            f"{image_context} Write 3 Instagram captions. "
+            "Match the creator's voice exactly if example captions are provided.\n\n"
+            "Generate 3 distinct versions (each must match the LENGTH instruction exactly):\n"
+            "1. Vibe Caption — mood-forward, emotionally aesthetic, dreamy.\n"
+            "2. Hook Caption — POV/question/opening statement, strongest engagement potential.\n"
+            "3. Story Caption — feels personal, believable lived moment, emotional realism.\n\n"
+            "Each caption must feel like it was written by a real person — not an AI. "
+            "Use natural rhythm, sentence fragments, internet-native phrasing. "
+            f"{hashtag_instruction}\n\n"
+            "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
+            "Format your response EXACTLY as:\n"
+            "CAPTION_1: [full caption with line breaks and hashtags]\n"
+            "CAPTION_2: [full caption with line breaks and hashtags]\n"
+            "CAPTION_3: [full caption with line breaks and hashtags]\n"
+            "MUSIC_1_1: [Artist] - [Song Title]\n"
+            "MUSIC_1_2: [Artist] - [Song Title]\n"
+            "MUSIC_1_3: [Artist] - [Song Title]\n"
+            "MUSIC_2_1: [Artist] - [Song Title]\n"
+            "MUSIC_2_2: [Artist] - [Song Title]\n"
+            "MUSIC_2_3: [Artist] - [Song Title]\n"
+            "MUSIC_3_1: [Artist] - [Song Title]\n"
+            "MUSIC_3_2: [Artist] - [Song Title]\n"
+            "MUSIC_3_3: [Artist] - [Song Title]\n\n"
+            "Only suggest real songs that are currently popular and trending on Instagram Reels / TikTok — songs people are actually using right now. "
+            "Prioritize songs with viral moments, trending sounds, or high reel usage. Each caption should have distinctly different music."
+        ),
+    })
 
     start_time = time.perf_counter()
-    response = gemini_model.generate_content(parts)
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1400,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+    )
     duration = time.perf_counter() - start_time
 
-    raw = response.text
-    usage = response.usage_metadata
-    input_tokens = usage.prompt_token_count or 0
-    output_tokens = usage.candidates_token_count or 0
-    # Gemini 2.0 Flash pricing: $0.10/M input, $0.40/M output
-    cost_usd = (input_tokens * 0.0000001) + (output_tokens * 0.0000004)
+    raw = message.content[0].text
+    usage = message.usage
+    input_tokens = usage.input_tokens
+    output_tokens = usage.output_tokens
+    # Haiku pricing: $0.80/M input, $4.00/M output
+    cost_usd = (input_tokens * 0.0000008) + (output_tokens * 0.000004)
 
     log_data = {
         "event": "generate_content",
