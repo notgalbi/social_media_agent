@@ -17,7 +17,6 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 import httpx
 import google.generativeai as genai
-import cv2
 from PIL import Image
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -338,7 +337,14 @@ class PostPayload(BaseModel):
 
 # --- Video/image helpers ---
 
-MAX_B64_BYTES = 4 * 1024 * 1024  # 4 MB base64 — Claude hard limit is 5 MB base64
+MAX_B64_BYTES = 4 * 1024 * 1024
+
+VIDEO_MIME = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".m4v": "video/mp4",
+}
 
 
 def compress_to_b64(img_bytes: bytes, max_b64_bytes: int = MAX_B64_BYTES) -> str:
@@ -372,19 +378,17 @@ def compress_to_b64(img_bytes: bytes, max_b64_bytes: int = MAX_B64_BYTES) -> str
             scale *= 0.75
 
 
-def extract_frames(video_path: str, num_frames: int = 3) -> list[str]:
-    cap = cv2.VideoCapture(video_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    indices = [int(total_frames * i / num_frames) for i in range(num_frames)]
-    frames_b64 = []
-    for idx in indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = cap.read()
-        if ret:
-            _, buffer = cv2.imencode(".jpg", frame)
-            frames_b64.append(compress_to_b64(bytes(buffer)))
-    cap.release()
-    return frames_b64
+def upload_video_to_gemini(video_path: str, mime_type: str):
+    """Upload video to Gemini File API and poll until ACTIVE."""
+    uploaded = genai.upload_file(path=video_path, mime_type=mime_type)
+    for _ in range(30):  # poll up to 60s
+        f = genai.get_file(uploaded.name)
+        if f.state.name == "ACTIVE":
+            return f
+        if f.state.name == "FAILED":
+            raise RuntimeError("Gemini video processing failed")
+        time.sleep(2)
+    raise RuntimeError("Gemini video processing timed out")
 
 
 # --- Caption generation ---
@@ -473,7 +477,7 @@ GENRE_LABELS = {
 }
 
 
-def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", num_source_files: int = 1, tones: str = "", length_level: int = 2, hashtag_count: int = 5, music_genres: str = "auto", music_vibe: str = "", custom_phrases: str = "", emoji_style: str = "", emoji_intensity: int = 2) -> dict:
+def generate_content(media_parts: list, num_source_files: int = 1, tones: str = "", length_level: int = 2, hashtag_count: int = 5, music_genres: str = "auto", music_vibe: str = "", custom_phrases: str = "", emoji_style: str = "", emoji_intensity: int = 2) -> dict:
     store = load_store()
     style_block = build_style_block(store.get("example_captions", []))
     tone_guide = get_tone_guide(tones)
@@ -484,18 +488,19 @@ def generate_content(image_b64_list: list[str], media_type: str = "image/jpeg", 
     phrase_guide = get_custom_phrase_guide(custom_phrases)
     system = BRAND_CONTEXT + f"\n\n{tone_guide}\n\n{length_guide}\n{hashtag_guide}\n{emoji_guide}\n{genre_guide}{phrase_guide}" + style_block
 
-    parts = []
-    for img_b64 in image_b64_list:
-        img_bytes = base64.b64decode(img_b64)
-        pil_img = Image.open(io.BytesIO(img_bytes))
-        parts.append(pil_img)
+    # media_parts is a list of PIL Images and/or Gemini file objects
+    has_video = any(hasattr(p, "uri") for p in media_parts)
+    parts = list(media_parts)
 
     if num_source_files > 1:
+        media_word = "videos and images" if has_video else "images"
         image_context = (
-            f"This is a carousel post with {num_source_files} images. "
+            f"This is a carousel post with {num_source_files} {media_word}. "
             "Look at all of them together as a cohesive set — the common theme, mood, and story they tell together. "
-            "Write captions that describe or celebrate the full set, not just a single image."
+            "Write captions that describe or celebrate the full set, not just a single item."
         )
+    elif has_video:
+        image_context = "Look closely at this video — analyze the subject, mood, content, motion, setting, and all visual details."
     else:
         image_context = "Look closely at this image — the subject, mood, colors, setting, and details."
 
@@ -583,21 +588,13 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones:
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
-    ext_to_mime = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp",
-        ".gif": "image/gif",
-    }
-
-    all_frames: list[str] = []
+    media_parts: list = []
     tmp_paths: list[str] = []
-    last_media_type = "image/jpeg"
+    uploaded_gemini_files: list = []
 
     for file in files:
         suffix = Path(file.filename).suffix.lower()
-        is_video = suffix in [".mp4", ".mov", ".avi", ".m4v"]
+        is_video = suffix in VIDEO_MIME
         is_image = suffix in [".jpg", ".jpeg", ".png", ".webp"]
         if not is_video and not is_image:
             continue
@@ -607,14 +604,15 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones:
             tmp_paths.append(tmp.name)
 
         if is_video:
-            frames_per_video = max(1, 3 // len(files))
-            all_frames.extend(extract_frames(tmp.name, num_frames=frames_per_video))
-            last_media_type = "image/jpeg"
+            gemini_file = upload_video_to_gemini(tmp.name, VIDEO_MIME[suffix])
+            uploaded_gemini_files.append(gemini_file)
+            media_parts.append(gemini_file)
         else:
-            all_frames.append(compress_to_b64(open(tmp.name, "rb").read()))
-            last_media_type = "image/jpeg"  # compress_to_b64 always outputs JPEG
+            compressed_b64 = compress_to_b64(open(tmp.name, "rb").read())
+            pil_img = Image.open(io.BytesIO(base64.b64decode(compressed_b64)))
+            media_parts.append(pil_img)
 
-    if not all_frames:
+    if not media_parts:
         raise HTTPException(status_code=400, detail="No supported files found")
 
     hashtag_count = min(hashtag_count, 5)
@@ -622,7 +620,7 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones:
     log.info(json.dumps({
         "event": "generate_captions_start",
         "num_files": len(files),
-        "num_frames": len(all_frames),
+        "num_media_parts": len(media_parts),
         "tones": tones,
         "length_level": length_level,
         "hashtag_count": hashtag_count,
@@ -634,7 +632,7 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones:
     }))
 
     try:
-        result = generate_content(all_frames, last_media_type, num_source_files=len(files), tones=tones, length_level=length_level, hashtag_count=hashtag_count, music_genres=music_genres, music_vibe=music_vibe, custom_phrases=custom_phrases, emoji_style=emoji_style, emoji_intensity=emoji_intensity)
+        result = generate_content(media_parts, num_source_files=len(files), tones=tones, length_level=length_level, hashtag_count=hashtag_count, music_genres=music_genres, music_vibe=music_vibe, custom_phrases=custom_phrases, emoji_style=emoji_style, emoji_intensity=emoji_intensity)
         duration = time.perf_counter() - start_time
         log.info(
             json.dumps(
@@ -673,6 +671,11 @@ async def generate_captions_endpoint(files: list[UploadFile] = File(...), tones:
         for p in tmp_paths:
             try:
                 os.unlink(p)
+            except:
+                pass
+        for gf in uploaded_gemini_files:
+            try:
+                genai.delete_file(gf.name)
             except:
                 pass
 
