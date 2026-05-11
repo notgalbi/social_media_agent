@@ -1,5 +1,4 @@
 import os
-import re
 import json
 import uuid
 import base64
@@ -405,57 +404,6 @@ def build_style_block(example_captions: list[str]) -> str:
     )
 
 
-def parse_captions(raw: str) -> list[str]:
-    captions = re.findall(
-        r"CAPTION_\d:\s*(.+?)(?=CAPTION_\d:|MUSIC_|$)", raw, re.DOTALL
-    )
-    captions = [c.strip() for c in captions if c.strip()]
-
-    if len(captions) < 3:
-        captions = re.findall(r"(?:^|\n)\s*\d[.:]\s*(.+)", raw)
-        captions = [c.strip() for c in captions if c.strip()]
-
-    if len(captions) < 3:
-        lines = [
-            l.strip()
-            for l in raw.strip().split("\n")
-            if l.strip() and not l.strip().startswith("MUSIC")
-        ]
-        captions = lines[:3]
-
-    while len(captions) < 3:
-        captions.append(
-            "Fresh, bold, and built for your goals. DM us to book your weekly meal prep."
-        )
-
-    return captions[:3]
-
-
-def parse_music(raw: str) -> dict:
-    result = {}
-    for cap in ["1", "2", "3"]:
-        songs = []
-        for mus in ["1", "2", "3"]:
-            # Line-by-line match — MULTILINE so $ = end of line, handles all dash types
-            m = re.search(
-                rf"MUSIC_{cap}_{mus}:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE
-            )
-            if m:
-                songs.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
-        result[cap] = songs
-
-    # Fallback: flat MUSIC_N format — duplicate across all captions
-    if not any(result.values()):
-        flat = []
-        for m in re.finditer(
-            r"MUSIC_\d:\s*(.+?)\s*[-–—]\s*(.+?)\s*$", raw, re.MULTILINE
-        ):
-            flat.append({"artist": m.group(1).strip(), "song": m.group(2).strip()})
-        for cap in ["1", "2", "3"]:
-            result[cap] = flat[:3]
-
-    return result
-
 
 GENRE_LABELS = {
     "auto": None,
@@ -510,6 +458,28 @@ def generate_content(media_parts: list, num_source_files: int = 1, tones: str = 
         tag_plural = "s" if hashtag_count > 1 else ""
         hashtag_instruction = f"End each caption with exactly {hashtag_count} niche-aware hashtag{tag_plural} on a new line — no more, no less."
 
+    song_schema = {
+        "type": "object",
+        "properties": {
+            "artist": {"type": "string"},
+            "song": {"type": "string"},
+        },
+        "required": ["artist", "song"],
+    }
+    music_array = {"type": "array", "items": song_schema}
+    response_schema = {
+        "type": "object",
+        "properties": {
+            "caption_1": {"type": "string"},
+            "caption_2": {"type": "string"},
+            "caption_3": {"type": "string"},
+            "music_1": music_array,
+            "music_2": music_array,
+            "music_3": music_array,
+        },
+        "required": ["caption_1", "caption_2", "caption_3", "music_1", "music_2", "music_3"],
+    }
+
     parts.append(
         f"{image_context} Write 3 Instagram captions. "
         "Match the creator's voice exactly if example captions are provided.\n\n"
@@ -520,39 +490,40 @@ def generate_content(media_parts: list, num_source_files: int = 1, tones: str = 
         "Each caption must feel like it was written by a real person — not an AI. "
         "Use natural rhythm, sentence fragments, internet-native phrasing. "
         f"{hashtag_instruction}\n\n"
-        "For each caption, suggest 3 real songs that specifically match THAT caption's mood and energy — not just the general vibe.\n\n"
-        "Format your response EXACTLY as:\n"
-        "CAPTION_1: [full caption with line breaks and hashtags]\n"
-        "CAPTION_2: [full caption with line breaks and hashtags]\n"
-        "CAPTION_3: [full caption with line breaks and hashtags]\n"
-        "MUSIC_1_1: [Artist] - [Song Title]\n"
-        "MUSIC_1_2: [Artist] - [Song Title]\n"
-        "MUSIC_1_3: [Artist] - [Song Title]\n"
-        "MUSIC_2_1: [Artist] - [Song Title]\n"
-        "MUSIC_2_2: [Artist] - [Song Title]\n"
-        "MUSIC_2_3: [Artist] - [Song Title]\n"
-        "MUSIC_3_1: [Artist] - [Song Title]\n"
-        "MUSIC_3_2: [Artist] - [Song Title]\n"
-        "MUSIC_3_3: [Artist] - [Song Title]\n\n"
-        "Only suggest real songs that are currently popular and trending on Instagram Reels / TikTok — songs people are actually using right now. "
-        "Prioritize songs with viral moments, trending sounds, or high reel usage. Each caption should have distinctly different music."
+        "For each caption suggest 3 real, currently trending songs (music_1/music_2/music_3) "
+        "that match THAT caption's specific mood — distinctly different across the three captions. "
+        "Only real songs with viral moments or high Reels/TikTok usage right now."
     )
 
     gemini_model = genai.GenerativeModel(
         "gemini-2.5-flash",
         system_instruction=system,
-        generation_config=genai.GenerationConfig(max_output_tokens=1400),
+        generation_config=genai.GenerationConfig(
+            max_output_tokens=1600,
+            response_mime_type="application/json",
+            response_schema=response_schema,
+        ),
     )
 
     start_time = time.perf_counter()
     response = gemini_model.generate_content(parts)
     duration = time.perf_counter() - start_time
 
-    raw = response.text
+    data = json.loads(response.text)
+    captions = [
+        data.get("caption_1", ""),
+        data.get("caption_2", ""),
+        data.get("caption_3", ""),
+    ]
+    music = {
+        "1": data.get("music_1", []),
+        "2": data.get("music_2", []),
+        "3": data.get("music_3", []),
+    }
+
     usage = response.usage_metadata
     input_tokens = usage.prompt_token_count or 0
     output_tokens = usage.candidates_token_count or 0
-    # Gemini 2.0 Flash pricing: $0.10/M input, $0.40/M output
     cost_usd = (input_tokens * 0.0000001) + (output_tokens * 0.0000004)
 
     log_data = {
@@ -574,10 +545,7 @@ def generate_content(media_parts: list, num_source_files: int = 1, tones: str = 
     TOKEN_STATS["total_cost"] += cost_usd
     TOKEN_STATS["total_calls"] += 1
 
-    return {
-        "captions": parse_captions(raw),
-        "music": parse_music(raw),
-    }
+    return {"captions": captions, "music": music}
 
 
 # --- Routes ---
