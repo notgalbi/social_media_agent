@@ -1,5 +1,20 @@
 const API_URL = "https://socialmediaagent-production-83c2.up.railway.app";
 
+// ── Analytics ──
+const SESSION_ID = (() => {
+  let id = sessionStorage.getItem("cap_sid");
+  if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem("cap_sid", id); }
+  return id;
+})();
+
+function track(event, props = {}) {
+  fetch(`${API_URL}/analytics/event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session: SESSION_ID, event, props }),
+  }).catch(() => {});
+}
+
 // ── Sound system (Web Audio API — no files needed) ──
 let audioCtx = null;
 
@@ -407,6 +422,7 @@ document.querySelectorAll(".tone-pill:not(.genre-pill)").forEach(pill => {
     pill.classList.toggle("active");
     if (pill.classList.contains("active")) {
       selectedTones.add(pill.dataset.tone);
+      track("tone_select", { tone: pill.dataset.tone });
     } else {
       selectedTones.delete(pill.dataset.tone);
     }
@@ -445,6 +461,7 @@ document.querySelectorAll(".genre-pill").forEach(pill => {
       } else {
         selectedGenres.add(genre);
         pill.classList.add("active");
+        track("genre_select", { genre });
       }
     }
     playSound("click");
@@ -528,7 +545,9 @@ updateEmojiSlider();
 setInterval(() => fetch(`${API_URL}/health`).catch(() => {}), 240000);
 
 // Set login URL
-document.getElementById("btn-instagram-login").href = `${API_URL}/auth/instagram`;
+const _igBtn = document.getElementById("btn-instagram-login");
+_igBtn.href = `${API_URL}/auth/instagram`;
+_igBtn.addEventListener("click", () => track("instagram_connect_start"));
 
 // On load — open to everyone, check if already connected
 async function initApp() {
@@ -587,6 +606,8 @@ function setActiveTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 }
 
+track("app_open", { has_username: !!localStorage.getItem("cap_sid") });
+
 function enterApp(username) {
   document.getElementById("main-header").classList.remove("hidden");
   document.getElementById("tab-bar").classList.remove("hidden");
@@ -620,6 +641,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
       loadSettingsData();
     }
     playSound("click");
+    track("tab_switch", { tab });
   });
 });
 
@@ -686,7 +708,13 @@ function addFiles(fileList) {
   );
   selectedFiles = [...selectedFiles, ...valid].slice(0, 10);
   renderCarousel();
-  if (selectedFiles.length) playSound("upload");
+  if (selectedFiles.length) {
+    playSound("upload");
+    track("file_upload", {
+      count: selectedFiles.length,
+      has_video: selectedFiles.some(f => f.type.startsWith("video/")),
+    });
+  }
 }
 
 function renderCarousel() {
@@ -764,6 +792,13 @@ async function generateCaptions() {
 
   playSound("generate");
   showScreen("screen-loading");
+  track("generate_start", {
+    tones: Array.from(selectedTones).join(","),
+    genres: Array.from(selectedGenres).join(","),
+    length: selectedLengthLevel,
+    hashtags: selectedHashtagCount,
+    file_count: selectedFiles.length,
+  });
 
   const formData = new FormData();
   selectedFiles.forEach(f => formData.append("files", f));
@@ -815,8 +850,10 @@ async function generateCaptions() {
     allMusic = data.music || {};
     renderCaptions(data.captions);
     showScreen("screen-captions");
+    track("generate_success", { level: selectedLengthLevel });
   } catch (err) {
     clearInterval(msgInterval);
+    track("generate_error", { error: (err.message || "unknown").slice(0, 80) });
     const msg = err.name === "AbortError"
       ? "Taking too long — try a smaller photo or video."
       : (err.message || "Could not reach the server. Check your connection and try again.").slice(0, 200);
@@ -887,7 +924,10 @@ function _drawMusicList() {
     `;
 
     const previewBtn = el.querySelector(".music-preview");
-    previewBtn.addEventListener("click", () => handlePreview(previewBtn, track.artist, track.song));
+    previewBtn.addEventListener("click", () => {
+      handlePreview(previewBtn, track.artist, track.song);
+      track("music_preview", { artist: track.artist, song: track.song });
+    });
 
     el.querySelector(".music-copy").addEventListener("click", async (e) => {
       playSound("music-copy");
@@ -1170,7 +1210,10 @@ function renderCaptions(captions) {
 }
 
 function selectCaption(card, text, index, silent = false) {
-  if (!silent) playSound("caption-select");
+  if (!silent) {
+    playSound("caption-select");
+    track("caption_select", { index });
+  }
   document.querySelectorAll(".caption-card").forEach(c => c.classList.remove("selected"));
   card.classList.add("selected");
   selectedCaption = text;
@@ -1243,6 +1286,7 @@ btnPost.addEventListener("click", async () => {
   playSound("success");
   showScreen("screen-success");
   launchConfetti();
+  track("post_open");
   openInstagram();
 });
 
@@ -1308,6 +1352,7 @@ async function saveCurrentDraft() {
   btn.textContent = "✓ Saved";
   setTimeout(() => btn.textContent = orig, 2000);
   playSound("success");
+  track("draft_save");
 }
 
 async function fileToThumb(file) {
@@ -1354,6 +1399,11 @@ function renderDrafts() {
     const date = new Date(draft.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const snippet = draft.caption.slice(0, 80) + (draft.caption.length > 80 ? "…" : "");
 
+    const schedLabel = draft.scheduledFor
+      ? "📅 " + new Date(draft.scheduledFor + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : "📅";
+    const schedClass = draft.scheduledFor ? " is-scheduled" : "";
+
     card.innerHTML = `
       <div class="draft-thumb">
         ${draft.imageThumb ? `<img src="${draft.imageThumb}" alt="" />` : '<div class="draft-thumb-placeholder">📷</div>'}
@@ -1363,6 +1413,8 @@ function renderDrafts() {
         <div class="draft-meta">
           <span class="draft-date">${date}</span>
           <button class="draft-status status-${draft.status}" data-id="${draft.id}">${STATUS_LABELS[draft.status]}</button>
+          <button class="draft-schedule-btn${schedClass}" data-id="${draft.id}" title="Pin to calendar date">${schedLabel}</button>
+          <input type="date" class="draft-date-input" data-id="${draft.id}" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" ${draft.scheduledFor ? `value="${draft.scheduledFor}"` : ""} />
         </div>
       </div>
       <button class="draft-delete" data-id="${draft.id}">✕</button>
@@ -1374,6 +1426,17 @@ function renderDrafts() {
       e.stopPropagation();
       cycleDraftStatus(draft.id);
       playSound("click");
+    });
+
+    const schedBtn = card.querySelector(".draft-schedule-btn");
+    const dateInput = card.querySelector(".draft-date-input");
+    schedBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      dateInput.click();
+    });
+    dateInput.addEventListener("change", e => {
+      e.stopPropagation();
+      scheduleDraft(draft.id, e.target.value || null);
     });
 
     card.querySelector(".draft-delete").addEventListener("click", e => {
@@ -1457,6 +1520,9 @@ function renderCalendar() {
     const el = document.createElement("div");
     el.className = "cal-day" + (isToday ? " today" : "") + (hasDraft ? " has-draft" : "");
     el.innerHTML = `<span class="cal-day-num">${d}</span>${hasDraft ? '<span class="cal-dot"></span>' : ""}`;
+    if (hasDraft) {
+      el.addEventListener("click", () => showDayDetail(dateStr));
+    }
     gridEl.appendChild(el);
   }
 }
@@ -1561,3 +1627,94 @@ function showStatus(el, msg) {
   el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 5000);
 }
+
+// ── Schedule draft to a calendar date ──
+function scheduleDraft(id, dateStr) {
+  const drafts = getDrafts();
+  const d = drafts.find(x => x.id === id);
+  if (!d) return;
+  d.scheduledFor = dateStr || null;
+  saveDrafts(drafts);
+  renderDrafts();
+  renderCalendar();
+  track("draft_schedule", { date: dateStr || "removed" });
+}
+
+// ── Day detail bottom sheet ──
+function showDayDetail(dateStr) {
+  const overlay = document.getElementById("day-detail-overlay");
+  const dateEl = document.getElementById("day-detail-date");
+  const listEl = document.getElementById("day-detail-list");
+
+  const d = new Date(dateStr + "T00:00:00");
+  dateEl.textContent = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  const allDrafts = getDrafts();
+  const dayDrafts = allDrafts.filter(draft =>
+    (draft.scheduledFor && draft.scheduledFor.slice(0, 10) === dateStr) ||
+    (draft.createdAt && draft.createdAt.slice(0, 10) === dateStr)
+  );
+
+  listEl.innerHTML = "";
+  if (!dayDrafts.length) {
+    listEl.innerHTML = '<div class="day-detail-empty">No drafts found for this date.</div>';
+  } else {
+    dayDrafts.forEach(draft => {
+      const item = document.createElement("div");
+      item.className = "draft-card";
+      const snippet = draft.caption.slice(0, 100) + (draft.caption.length > 100 ? "…" : "");
+      item.innerHTML = `
+        <div class="draft-thumb">
+          ${draft.imageThumb ? `<img src="${draft.imageThumb}" alt="" />` : '<div class="draft-thumb-placeholder">📷</div>'}
+        </div>
+        <div class="draft-info">
+          <div class="draft-caption">${snippet}</div>
+          <div class="draft-meta">
+            <span class="draft-status status-${draft.status}">${STATUS_LABELS[draft.status]}</span>
+          </div>
+        </div>
+        <button class="day-detail-open-btn">Open →</button>
+      `;
+      item.querySelector(".day-detail-open-btn").addEventListener("click", () => {
+        closeDayDetail();
+        setTimeout(() => {
+          loadDraft(draft);
+          setActiveTab("create");
+        }, 300);
+        track("day_detail_open_draft");
+      });
+      listEl.appendChild(item);
+    });
+  }
+
+  overlay.classList.remove("hidden");
+  playSound("swipe");
+  track("day_detail_open", { date: dateStr, count: dayDrafts.length });
+}
+
+function closeDayDetail() {
+  document.getElementById("day-detail-overlay").classList.add("hidden");
+}
+
+document.getElementById("day-detail-close").addEventListener("click", closeDayDetail);
+document.getElementById("day-detail-backdrop").addEventListener("click", closeDayDetail);
+
+// ── Theme switcher ──
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme === "rose" ? "" : theme);
+  localStorage.setItem("cap_theme", theme);
+  document.querySelectorAll(".theme-swatch").forEach(s =>
+    s.classList.toggle("active", s.dataset.theme === theme)
+  );
+  track("theme_change", { theme });
+}
+
+const savedTheme = localStorage.getItem("cap_theme") || "rose";
+applyTheme(savedTheme);
+
+document.querySelectorAll(".theme-swatch").forEach(swatch => {
+  swatch.addEventListener("click", () => {
+    applyTheme(swatch.dataset.theme);
+    playSound("click");
+  });
+});

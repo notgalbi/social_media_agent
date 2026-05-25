@@ -7,6 +7,8 @@ import tempfile
 import secrets
 import io
 import time
+import sqlite3
+import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlencode
@@ -20,7 +22,7 @@ from PIL import Image
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -42,6 +44,34 @@ if SENTRY_DSN:
 STORE_PATH = Path(__file__).parent / "captions_store.json"
 UPLOADS_DIR = Path(__file__).parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
+
+ANALYTICS_DB = Path(__file__).parent / "analytics.db"
+ANALYTICS_KEY = os.getenv("ANALYTICS_KEY", "captionly-admin")
+
+
+def _aconn():
+    conn = sqlite3.connect(str(ANALYTICS_DB))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_analytics():
+    with _aconn() as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS events (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            session   TEXT NOT NULL,
+            event     TEXT NOT NULL,
+            props     TEXT DEFAULT '{}',
+            ts        TEXT NOT NULL,
+            ua        TEXT DEFAULT '',
+            ip        TEXT DEFAULT ''
+        )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_ev  ON events(event)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_ts  ON events(ts)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_sid ON events(session)")
+
+
+_init_analytics()
 
 META_APP_ID = os.getenv("META_APP_ID", "")
 META_APP_SECRET = os.getenv("META_APP_SECRET", "")
@@ -346,6 +376,265 @@ class BufferTokenPayload(BaseModel):
 class PostPayload(BaseModel):
     caption: str
     image_filename: str
+
+
+class AnalyticsEvent(BaseModel):
+    session: str
+    event: str
+    props: dict = {}
+
+
+# --- Analytics routes ---
+
+
+@app.post("/analytics/event")
+async def analytics_track(payload: AnalyticsEvent, request: Request):
+    ua = request.headers.get("user-agent", "")[:200]
+    raw_ip = request.client.host if request.client else ""
+    ip = hashlib.sha256(raw_ip.encode()).hexdigest()[:12]
+    ts = datetime.now(timezone.utc).isoformat()
+    with _aconn() as c:
+        c.execute(
+            "INSERT INTO events (session,event,props,ts,ua,ip) VALUES (?,?,?,?,?,?)",
+            (payload.session, payload.event, json.dumps(payload.props), ts, ua, ip),
+        )
+    return {"ok": True}
+
+
+@app.get("/analytics/data")
+def analytics_data(key: str = ""):
+    if key != ANALYTICS_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    with _aconn() as c:
+        def q(sql, *args):
+            return c.execute(sql, args).fetchall()
+
+        # Overview
+        sessions_today = q("SELECT COUNT(DISTINCT session) n FROM events WHERE ts>=date('now')")
+        sessions_7d    = q("SELECT COUNT(DISTINCT session) n FROM events WHERE ts>=date('now','-7 days')")
+        sessions_30d   = q("SELECT COUNT(DISTINCT session) n FROM events WHERE ts>=date('now','-30 days')")
+        errors_7d      = q("SELECT COUNT(*) n FROM events WHERE event='generate_error'  AND ts>=date('now','-7 days')")
+        generates_7d   = q("SELECT COUNT(*) n FROM events WHERE event='generate_success' AND ts>=date('now','-7 days')")
+
+        # Funnel (last 30d unique sessions per step)
+        funnel_steps = ["app_open","file_upload","generate_success","caption_select","post_open"]
+        funnel = {}
+        for step in funnel_steps:
+            row = c.execute("SELECT COUNT(DISTINCT session) n FROM events WHERE event=? AND ts>=date('now','-30 days')", (step,)).fetchone()
+            funnel[step] = row["n"]
+
+        # Events per day last 14d
+        by_day = q("""SELECT substr(ts,1,10) day, COUNT(*) n FROM events
+                      WHERE ts>=date('now','-14 days') GROUP BY day ORDER BY day""")
+
+        # Top tones (last 30d)
+        tones = q("""SELECT json_extract(props,'$.tone') tone, COUNT(*) n FROM events
+                     WHERE event='tone_select' AND tone IS NOT NULL AND ts>=date('now','-30 days')
+                     GROUP BY tone ORDER BY n DESC LIMIT 10""")
+
+        # Top genres (last 30d)
+        genres = q("""SELECT json_extract(props,'$.genre') genre, COUNT(*) n FROM events
+                      WHERE event='genre_select' AND genre IS NOT NULL AND ts>=date('now','-30 days')
+                      GROUP BY genre ORDER BY n DESC LIMIT 10""")
+
+        # Top length levels
+        lengths = q("""SELECT json_extract(props,'$.level') level, COUNT(*) n FROM events
+                       WHERE event='generate_success' AND level IS NOT NULL AND ts>=date('now','-30 days')
+                       GROUP BY level ORDER BY n DESC""")
+
+        # Recent 60 events
+        recent = q("SELECT session,event,props,ts FROM events ORDER BY id DESC LIMIT 60")
+
+    return {
+        "overview": {
+            "sessions_today": sessions_today[0]["n"],
+            "sessions_7d":    sessions_7d[0]["n"],
+            "sessions_30d":   sessions_30d[0]["n"],
+            "errors_7d":      errors_7d[0]["n"],
+            "generates_7d":   generates_7d[0]["n"],
+        },
+        "funnel":     funnel,
+        "by_day":     [{"day": r["day"], "count": r["n"]} for r in by_day],
+        "top_tones":  {r["tone"]: r["n"] for r in tones},
+        "top_genres": {r["genre"]: r["n"] for r in genres},
+        "top_lengths":{r["level"]: r["n"] for r in lengths},
+        "recent":     [{"session": r["session"][:8], "event": r["event"],
+                        "props": r["props"], "ts": r["ts"][:19]} for r in recent],
+    }
+
+
+_DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Captionly — Analytics</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0f;color:#e8e8ea;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
+header{padding:24px 32px;border-bottom:1px solid #1e1e24;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:20px;font-weight:700;letter-spacing:-0.3px;color:#fff}
+header h1 span{color:#b8405a}
+.badge{font-size:11px;color:#666;background:#18181d;border:1px solid #2a2a32;border-radius:6px;padding:4px 10px}
+main{padding:28px 32px;display:flex;flex-direction:column;gap:28px;max-width:1400px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.card{background:#13131a;border:1px solid #1e1e28;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.card-label{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.card-value{font-size:32px;font-weight:700;color:#fff;line-height:1}
+.card-sub{font-size:11px;color:#444}
+.card.accent{border-color:#3a1520;background:#1a0e12}
+.card.accent .card-value{color:#b8405a}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
+@media(max-width:900px){.row2,.row3{grid-template-columns:1fr}}
+.panel{background:#13131a;border:1px solid #1e1e28;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:16px}
+.panel-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#555}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.bar-label{width:110px;flex-shrink:0;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;background:#1e1e28;border-radius:4px;height:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#b8405a,#852d42);transition:width 0.6s ease}
+.bar-count{width:36px;text-align:right;color:#555;flex-shrink:0;font-size:12px}
+.funnel-step{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #1a1a22}
+.funnel-step:last-child{border-bottom:none}
+.funnel-label{width:150px;flex-shrink:0;color:#bbb;font-size:13px}
+.funnel-bar{flex:1;background:#1e1e28;border-radius:4px;height:10px;overflow:hidden}
+.funnel-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#b8405a 0%,#d4607c 100%)}
+.funnel-n{width:60px;text-align:right;font-weight:700;color:#fff;flex-shrink:0}
+.funnel-pct{width:48px;text-align:right;font-size:11px;color:#555;flex-shrink:0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:#444;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;padding:8px 12px;border-bottom:1px solid #1e1e28}
+td{padding:8px 12px;border-bottom:1px solid #161620;color:#bbb;font-family:monospace}
+td.event-name{color:#e8e8ea;font-weight:600;font-family:sans-serif;font-size:13px}
+td.ts{color:#444}
+.tag{display:inline-block;background:#1a0e12;border:1px solid #3a1520;color:#b8405a;font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px;font-family:monospace}
+.loading{color:#333;font-size:16px;text-align:center;padding:80px}
+canvas{width:100%!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Captionly <span>Analytics</span></h1>
+  <span class="badge" id="updated">Loading...</span>
+</header>
+<main>
+  <div class="cards" id="cards"><div class="loading">Loading data...</div></div>
+  <div class="row2">
+    <div class="panel"><div class="panel-title">Customer Funnel — Last 30 Days</div><div id="funnel"></div></div>
+    <div class="panel"><div class="panel-title">Events Per Day</div><canvas id="chart-days" height="180"></canvas></div>
+  </div>
+  <div class="row3">
+    <div class="panel"><div class="panel-title">Top Vibes</div><div id="tones"></div></div>
+    <div class="panel"><div class="panel-title">Top Genres</div><div id="genres"></div></div>
+    <div class="panel"><div class="panel-title">Caption Length</div><div id="lengths"></div></div>
+  </div>
+  <div class="panel"><div class="panel-title">Recent Events</div><div id="recent"></div></div>
+</main>
+<script>
+const KEY = new URLSearchParams(location.search).get("key") || "";
+const API = location.origin;
+const LENGTH_LABELS = {"1":"Micro","2":"Short","3":"Medium","4":"Long","5":"Story"};
+const FUNNEL_LABELS = {
+  app_open:"App Open",file_upload:"File Uploaded",
+  generate_success:"Captions Generated",caption_select:"Caption Selected",post_open:"Post Opened"
+};
+let dayChart = null;
+
+async function load() {
+  const r = await fetch(`${API}/analytics/data?key=${KEY}`);
+  if (!r.ok) { document.querySelector("main").innerHTML='<div class="loading">Access denied — check your key</div>'; return; }
+  const d = await r.json();
+  document.getElementById("updated").textContent = "Updated " + new Date().toLocaleTimeString();
+
+  // Cards
+  const ov = d.overview;
+  const cvt = ov.generates_7d ? Math.round(d.funnel.post_open/(d.funnel.app_open||1)*100) : 0;
+  document.getElementById("cards").innerHTML = `
+    <div class="card"><div class="card-label">Sessions Today</div><div class="card-value">${ov.sessions_today}</div></div>
+    <div class="card"><div class="card-label">Sessions 7d</div><div class="card-value">${ov.sessions_7d}</div></div>
+    <div class="card"><div class="card-label">Sessions 30d</div><div class="card-value">${ov.sessions_30d}</div></div>
+    <div class="card"><div class="card-label">Captions Gen 7d</div><div class="card-value">${ov.generates_7d}</div></div>
+    <div class="card accent"><div class="card-label">End-to-End CVR</div><div class="card-value">${cvt}%</div><div class="card-sub">open → post</div></div>
+    <div class="card accent"><div class="card-label">Errors 7d</div><div class="card-value">${ov.errors_7d}</div></div>
+  `;
+
+  // Funnel
+  const funnelSteps = ["app_open","file_upload","generate_success","caption_select","post_open"];
+  const top = d.funnel.app_open || 1;
+  document.getElementById("funnel").innerHTML = funnelSteps.map(k => {
+    const n = d.funnel[k] || 0;
+    const pct = Math.round(n/top*100);
+    return `<div class="funnel-step">
+      <div class="funnel-label">${FUNNEL_LABELS[k]}</div>
+      <div class="funnel-bar"><div class="funnel-fill" style="width:${pct}%"></div></div>
+      <div class="funnel-n">${n}</div>
+      <div class="funnel-pct">${pct}%</div>
+    </div>`;
+  }).join("");
+
+  // Days chart
+  const days = d.by_day;
+  if (dayChart) dayChart.destroy();
+  dayChart = new Chart(document.getElementById("chart-days"), {
+    type:"line",
+    data:{
+      labels: days.map(x=>x.day.slice(5)),
+      datasets:[{
+        data: days.map(x=>x.count),
+        fill:true,
+        borderColor:"#b8405a",
+        backgroundColor:"rgba(184,64,90,0.12)",
+        tension:0.4,pointRadius:3,pointBackgroundColor:"#b8405a",
+      }]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:"#1e1e28"},ticks:{color:"#444",font:{size:11}}},
+        y:{grid:{color:"#1e1e28"},ticks:{color:"#444",font:{size:11}},beginAtZero:true}
+      }
+    }
+  });
+
+  // Bars helper
+  function bars(el, data, labelFn) {
+    const max = Math.max(1,...Object.values(data));
+    const html = Object.entries(data).map(([k,v]) =>
+      `<div class="bar-row">
+        <div class="bar-label">${labelFn ? labelFn(k) : k}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/max*100)}%"></div></div>
+        <div class="bar-count">${v}</div>
+      </div>`
+    ).join("");
+    document.getElementById(el).innerHTML = html || '<div style="color:#333;padding:12px 0">No data yet</div>';
+  }
+
+  bars("tones",  d.top_tones,  null);
+  bars("genres", d.top_genres, null);
+  bars("lengths",d.top_lengths,k=>LENGTH_LABELS[k]||k);
+
+  // Recent events
+  const rows = d.recent.map(r => {
+    let propsStr = "";
+    try { const p=JSON.parse(r.props); propsStr=Object.entries(p).map(([k,v])=>`<span class="tag">${k}:${v}</span>`).join(" "); } catch{}
+    return `<tr><td class="event-name">${r.event}</td><td>${propsStr}</td><td>${r.session}</td><td class="ts">${r.ts}</td></tr>`;
+  }).join("");
+  document.getElementById("recent").innerHTML =
+    `<table><thead><tr><th>Event</th><th>Properties</th><th>Session</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>"""
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+def analytics_dashboard(key: str = ""):
+    if key != ANALYTICS_KEY:
+        return HTMLResponse("<h3 style='font-family:sans-serif;padding:40px'>Access denied</h3>", status_code=403)
+    return HTMLResponse(_DASHBOARD_HTML)
 
 
 # --- Video/image helpers ---

@@ -315,6 +315,27 @@
         <button class="btn-secondary" id="btn-disconnect">Disconnect</button>
       </div>
 
+      <div class="settings-divider">— appearance —</div>
+
+      <div class="settings-block">
+        <div class="settings-label">App Theme</div>
+        <div class="settings-sub">Change the look and feel of the interface.</div>
+        <div class="theme-picker">
+          <div class="theme-option">
+            <div class="theme-swatch active" data-theme="rose" title="Rose"></div>
+            <span class="theme-swatch-label">Rose</span>
+          </div>
+          <div class="theme-option">
+            <div class="theme-swatch" data-theme="carbon" title="Carbon"></div>
+            <span class="theme-swatch-label">Carbon</span>
+          </div>
+          <div class="theme-option">
+            <div class="theme-swatch" data-theme="forest" title="Forest"></div>
+            <span class="theme-swatch-label">Forest</span>
+          </div>
+        </div>
+      </div>
+
       <div class="settings-divider">— manual style —</div>
 
       <div class="settings-block">
@@ -326,6 +347,18 @@
       </div>
 
     </section>
+
+    <!-- Day Detail Bottom Sheet -->
+    <div class="day-detail-overlay hidden" id="day-detail-overlay">
+      <div class="day-detail-backdrop" id="day-detail-backdrop"></div>
+      <div class="day-detail-panel">
+        <div class="day-detail-header">
+          <span class="day-detail-date" id="day-detail-date"></span>
+          <button class="day-detail-close" id="day-detail-close">✕</button>
+        </div>
+        <div class="day-detail-list" id="day-detail-list"></div>
+      </div>
+    </div>
 
     <!-- Bottom Tab Bar -->
     <nav class="tab-bar hidden" id="tab-bar">
