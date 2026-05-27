@@ -15,6 +15,32 @@ function track(event, props = {}) {
   }).catch(() => {});
 }
 
+// ── Loading screen example captions ──
+const LOADER_EXAMPLES = [
+  { tone: "Aesthetic",    text: "soft mornings and slower days 🌸\n#morningroutine #thatgirl #softlife" },
+  { tone: "Bold",         text: "understood the assignment and submitted early 💅\n#ootd #outfitcheck #styleinspo" },
+  { tone: "Relatable",    text: "not me emotionally attached to a parking lot sunset 😭\n#goldenhour #vibes #relatable" },
+  { tone: "Cinematic",    text: "the scene writes itself 🎞️\n#filmphotography #editorial #cinematic" },
+  { tone: "Foodie",       text: "ate this in complete silence out of respect 🍽️\n#foodie #eeeeeats #foodtok" },
+  { tone: "Motivational", text: "discipline changed everything. quietly.\n#thatgirl #morningroutine #glowup" },
+  { tone: "Wanderlust",   text: "some places just stay with you ✈️\n#travel #wanderlust #solotravel" },
+  { tone: "Moody",        text: "something shifted and i can feel it 🌙\n#darkacademia #moody #editorial" },
+  { tone: "Hustle",       text: "nobody claps at the beginning. that's fine.\n#entrepreneurlife #grind #buildinginpublic" },
+  { tone: "Romantic",     text: "love looked softer here 💕\n#couples #golden #datingera" },
+];
+
+(function buildLoaderExamples() {
+  const strip = document.getElementById("loader-examples-strip");
+  if (!strip) return;
+  // Double the list so the seamless loop works
+  [...LOADER_EXAMPLES, ...LOADER_EXAMPLES].forEach(({ tone, text }) => {
+    const el = document.createElement("div");
+    el.className = "loader-example-item";
+    el.innerHTML = `<div class="loader-example-tone">${tone}</div><div class="loader-example-text">${text}</div>`;
+    strip.appendChild(el);
+  });
+})();
+
 // ── Sound system (Web Audio API — no files needed) ──
 let audioCtx = null;
 
