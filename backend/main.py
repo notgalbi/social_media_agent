@@ -605,17 +605,26 @@ canvas{width:100%!important}
       <div class="flow-legend-item"><div class="flow-legend-dot" style="background:#1e1e2a"></div>No data yet</div>
     </div>
   </div>
-  <div class="row2">
+  <div class="row3">
     <div class="entry-box">
       <div class="entry-box-head">
         <div class="entry-box-icon">⚙</div>
         <div class="entry-box-meta">
-          <div class="entry-box-title">Settings Tab</div>
-          <div class="entry-box-total" id="settings-total">—</div>
-          <div class="entry-box-sub">sessions opened Settings</div>
+          <div class="entry-box-title">Settings · from Upload</div>
+          <div class="entry-box-total" id="settings-upload-total">—</div>
+          <div class="entry-box-sub">sessions tapped Settings<br>while on Upload screen</div>
         </div>
       </div>
-      <div class="entry-box-body" id="settings-entries"></div>
+    </div>
+    <div class="entry-box">
+      <div class="entry-box-head">
+        <div class="entry-box-icon">⚙</div>
+        <div class="entry-box-meta">
+          <div class="entry-box-title">Settings · from Captions</div>
+          <div class="entry-box-total" id="settings-captions-total">—</div>
+          <div class="entry-box-sub">sessions tapped Settings<br>after captions generated</div>
+        </div>
+      </div>
     </div>
     <div class="entry-box">
       <div class="entry-box-head">
@@ -720,8 +729,14 @@ async function load() {
   bars("lengths",d.top_lengths,k=>LENGTH_LABELS[k]||k);
 
   renderFlow(d);
-  renderEntries("settings-entries", d.tab_entries?.settings);
-  renderEntries("drafts-entries",   d.tab_entries?.drafts);
+  const st = d.tab_entries?.settings || {};
+  const settUpload   = st["screen-upload"]   || 0;
+  const settCaptions = st["screen-captions"] || 0;
+  const settUpEl = document.getElementById("settings-upload-total");
+  const settCapEl = document.getElementById("settings-captions-total");
+  if (settUpEl)  settUpEl.textContent  = settUpload;
+  if (settCapEl) settCapEl.textContent = settCaptions;
+  renderEntries("drafts-entries", d.tab_entries?.drafts);
 
   // Recent events
   const rows = d.recent.map(r => {
@@ -821,7 +836,7 @@ function renderFlow(d) {
   function arrow(x1, y1, x2, y2, n, side) {
     const col = side ? "#3d3d58" : "#b8405a";
     const alpha = n ? Math.min(0.92, Math.max(0.22, n/maxN*0.9)) : 0.1;
-    const sw = n ? Math.max(1.5, Math.min(7, n/maxN*7)) : 1.5;
+    const sw = n ? Math.max(1, Math.min(2.5, n/maxN*2.5)) : 1;
     const mid = side ? "arr-s" : "arr-m";
     const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy)||1;
     const ex = x2 - dx/len*9, ey = y2 - dy/len*9;
