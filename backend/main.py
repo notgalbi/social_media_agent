@@ -814,8 +814,10 @@ function renderFlow(d) {
     {id:"screen-loading",  x:290, y:105, label:"Loading",      main:true },
     {id:"screen-captions", x:430, y:105, label:"Captions",     main:true },
     {id:"screen-success",  x:570, y:105, label:"Success ✓",main:true },
-    {id:"screen-drafts",   x:150, y:15,  label:"Drafts Tab",   main:false},
-    {id:"draft-saved",     x:430, y:200, label:"Draft Saved",  main:false, fixed: draftSaved},
+    {id:"screen-drafts",        x:150, y:15,  label:"Drafts Tab",       main:false},
+    {id:"settings-from-upload", x:430, y:15,  label:"Settings Tab",     main:false, fixed: (d.tab_entries?.settings?.["screen-upload"]||0)},
+    {id:"settings-from-captions",x:570, y:15, label:"Settings Tab",     main:false, fixed: (d.tab_entries?.settings?.["screen-captions"]||0)},
+    {id:"draft-saved",          x:430, y:200, label:"Draft Saved",      main:false, fixed: draftSaved},
   ];
 
   const nodeMap = {};
@@ -856,6 +858,14 @@ function renderFlow(d) {
   // Side: Upload -> Drafts (up)
   { const a=nodeMap["screen-upload"], b=nodeMap["screen-drafts"];
     arrow(ncx(a), a.y, ncx(b), b.y+NH+2, sv["screen-drafts"]||0, true); }
+  // Side: Upload -> Settings (its own node, up)
+  { const a=nodeMap["screen-upload"], b=nodeMap["settings-from-upload"];
+    const n = d.tab_entries?.settings?.["screen-upload"]||0;
+    arrow(ncx(a), a.y, ncx(b), b.y+NH+2, n, true); }
+  // Side: Captions -> Settings (its own node, up)
+  { const a=nodeMap["screen-captions"], b=nodeMap["settings-from-captions"];
+    const n = d.tab_entries?.settings?.["screen-captions"]||0;
+    arrow(ncx(a), a.y, ncx(b), b.y+NH+2, n, true); }
   // Side: Captions -> Draft Saved (down)
   { const a=nodeMap["screen-captions"], b=nodeMap["draft-saved"];
     arrow(ncx(a), a.y+NH, ncx(b), b.y, draftSaved, true); }
