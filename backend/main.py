@@ -815,7 +815,6 @@ function renderFlow(d) {
     {id:"screen-captions", x:430, y:105, label:"Captions",     main:true },
     {id:"screen-success",  x:570, y:105, label:"Success ✓",main:true },
     {id:"screen-drafts",   x:150, y:15,  label:"Drafts Tab",   main:false},
-    {id:"screen-settings", x:290, y:15,  label:"Settings Tab", main:false},
     {id:"draft-saved",     x:430, y:200, label:"Draft Saved",  main:false, fixed: draftSaved},
   ];
 
@@ -857,14 +856,6 @@ function renderFlow(d) {
   // Side: Upload -> Drafts (up)
   { const a=nodeMap["screen-upload"], b=nodeMap["screen-drafts"];
     arrow(ncx(a), a.y, ncx(b), b.y+NH+2, sv["screen-drafts"]||0, true); }
-  // Side: Upload -> Settings (diagonal up-right)
-  { const a=nodeMap["screen-upload"], b=nodeMap["screen-settings"];
-    const n = trMap["screen-upload→screen-settings"] || (!hasData ? Math.round((sv["screen-settings"]||0)*0.5) : 0);
-    arrow(a.x+NW, a.y, ncx(b), b.y+NH+2, n, true); }
-  // Side: Captions -> Settings (diagonal up-left)
-  { const a=nodeMap["screen-captions"], b=nodeMap["screen-settings"];
-    const n = trMap["screen-captions→screen-settings"] || (!hasData ? Math.round((sv["screen-settings"]||0)*0.5) : 0);
-    arrow(a.x, a.y, ncx(b), b.y+NH+2, n, true); }
   // Side: Captions -> Draft Saved (down)
   { const a=nodeMap["screen-captions"], b=nodeMap["draft-saved"];
     arrow(ncx(a), a.y+NH, ncx(b), b.y, draftSaved, true); }
