@@ -569,6 +569,20 @@ canvas{width:100%!important}
 .flow-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
 .flow-legend-item{display:flex;align-items:center;gap:7px;font-size:11px;color:#555}
 .flow-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.entry-box{background:#13131a;border:1px solid #1e1e28;border-radius:12px;overflow:hidden}
+.entry-box-head{padding:18px 20px 14px;border-bottom:1px solid #1a1a24;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.entry-box-icon{font-size:22px;line-height:1;flex-shrink:0;margin-top:2px}
+.entry-box-meta{flex:1}
+.entry-box-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#555;margin-bottom:6px}
+.entry-box-total{font-size:36px;font-weight:800;color:#fff;line-height:1}
+.entry-box-sub{font-size:11px;color:#444;margin-top:4px}
+.entry-box-body{padding:14px 20px 18px;display:flex;flex-direction:column;gap:10px}
+.entry-row{display:flex;align-items:center;gap:10px}
+.entry-label{font-size:12px;color:#aaa;width:130px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry-track{flex:1;background:#1e1e28;border-radius:4px;height:7px;overflow:hidden}
+.entry-fill{height:100%;border-radius:4px}
+.entry-count{font-size:12px;color:#555;width:30px;text-align:right;flex-shrink:0}
+.entry-empty{font-size:12px;color:#2a2a36;padding:16px 0;text-align:center}
 </style>
 </head>
 <body>
@@ -592,8 +606,28 @@ canvas{width:100%!important}
     </div>
   </div>
   <div class="row2">
-    <div class="panel"><div class="panel-title">Settings Tab — Where Users Came From</div><div id="settings-entries"></div></div>
-    <div class="panel"><div class="panel-title">Drafts Tab — Where Users Came From</div><div id="drafts-entries"></div></div>
+    <div class="entry-box">
+      <div class="entry-box-head">
+        <div class="entry-box-icon">⚙</div>
+        <div class="entry-box-meta">
+          <div class="entry-box-title">Settings Tab</div>
+          <div class="entry-box-total" id="settings-total">—</div>
+          <div class="entry-box-sub">sessions opened Settings</div>
+        </div>
+      </div>
+      <div class="entry-box-body" id="settings-entries"></div>
+    </div>
+    <div class="entry-box">
+      <div class="entry-box-head">
+        <div class="entry-box-icon">📅</div>
+        <div class="entry-box-meta">
+          <div class="entry-box-title">Drafts Tab</div>
+          <div class="entry-box-total" id="drafts-total">—</div>
+          <div class="entry-box-sub">sessions opened Drafts</div>
+        </div>
+      </div>
+      <div class="entry-box-body" id="drafts-entries"></div>
+    </div>
   </div>
   <div class="row3">
     <div class="panel"><div class="panel-title">Top Vibes</div><div id="tones"></div></div>
@@ -709,21 +743,29 @@ const SCREEN_NAMES = {
   "screen-welcome":  "Welcome screen",
 };
 
-function renderEntries(elId, data) {
-  const el = document.getElementById(elId);
+function renderEntries(bodyId, data) {
+  const tabName = bodyId.replace("-entries","");
+  const totalEl = document.getElementById(tabName + "-total");
+  const bodyEl  = document.getElementById(bodyId);
   if (!data || !Object.keys(data).length) {
-    el.innerHTML = '<div style="color:#333;padding:12px 0;font-size:13px">No data yet — will populate once users open the app after this deploy.</div>';
+    if (totalEl) totalEl.textContent = "0";
+    bodyEl.innerHTML = '<div class="entry-empty">No data yet — populates after next user session.</div>';
     return;
   }
   const sorted = Object.entries(data).sort((a,b) => b[1]-a[1]);
-  const max = Math.max(1, ...sorted.map(([,v])=>v));
-  el.innerHTML = sorted.map(([screen, n]) => {
+  const total  = sorted.reduce((s,[,v]) => s+v, 0);
+  const max    = Math.max(1, sorted[0][1]);
+  if (totalEl) totalEl.textContent = total;
+  const accent = tabName === "settings" ? "#b8405a" : "#5a8abf";
+  bodyEl.innerHTML = sorted.map(([screen, n]) => {
     const label = SCREEN_NAMES[screen] || screen;
-    const pct = Math.round(n/max*100);
-    return `<div class="bar-row">
-      <div class="bar-label">${label}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-      <div class="bar-count">${n}</div>
+    const pct   = Math.round(n/max*100);
+    const share = Math.round(n/total*100);
+    return `<div class="entry-row">
+      <div class="entry-label">${label}</div>
+      <div class="entry-track"><div class="entry-fill" style="width:${pct}%;background:${accent};opacity:0.75"></div></div>
+      <div class="entry-count">${n}</div>
+      <div style="font-size:10px;color:#3a3a50;width:28px;flex-shrink:0;text-align:right">${share}%</div>
     </div>`;
   }).join("");
 }
