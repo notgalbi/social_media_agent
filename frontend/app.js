@@ -427,6 +427,7 @@ function showScreen(id) {
   void next.offsetWidth;
   next.classList.add("enter");
   if (CREATE_SCREENS.has(id)) lastCreateScreen = id;
+  track("screen_view", { screen: id });
 }
 
 const CAPTION_LABELS = ["Casual", "Engaging", "Call to Action"];

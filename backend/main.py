@@ -445,6 +445,38 @@ def analytics_data(key: str = ""):
         # Recent 60 events
         recent = q("SELECT session,event,props,ts FROM events ORDER BY id DESC LIMIT 60")
 
+        # Screen views (last 30d unique sessions per screen)
+        sv_raw = q("""SELECT json_extract(props,'$.screen') s, COUNT(DISTINCT session) n
+                      FROM events WHERE event='screen_view' AND ts>=date('now','-30 days')
+                      GROUP BY s""")
+        screen_views = {r["s"]: r["n"] for r in sv_raw if r["s"]}
+
+        # Tab switch counts (last 30d unique sessions)
+        tab_raw = q("""SELECT json_extract(props,'$.tab') t, COUNT(DISTINCT session) n
+                       FROM events WHERE event='tab_switch' AND ts>=date('now','-30 days')
+                       GROUP BY t""")
+        tab_counts = {r["t"]: r["n"] for r in tab_raw if r["t"]}
+
+        # Screen transitions: next screen after each screen_view (last 30d)
+        trans_raw = q("""
+            WITH sv AS (
+                SELECT session, id, json_extract(props,'$.screen') s
+                FROM events WHERE event='screen_view' AND ts>=date('now','-30 days')
+            )
+            SELECT s1.s as from_s,
+                (SELECT s2.s FROM sv s2
+                 WHERE s2.session=s1.session AND s2.id>s1.id
+                 ORDER BY s2.id LIMIT 1) as to_s,
+                COUNT(*) n
+            FROM sv s1
+            GROUP BY from_s, to_s HAVING to_s IS NOT NULL
+            ORDER BY n DESC LIMIT 50
+        """)
+        transitions = [{"from": r["from_s"], "to": r["to_s"], "n": r["n"]} for r in trans_raw]
+
+        # Draft saves (last 30d unique sessions)
+        draft_saves = q("SELECT COUNT(DISTINCT session) n FROM events WHERE event='draft_save' AND ts>=date('now','-30 days')")
+
     return {
         "overview": {
             "sessions_today": sessions_today[0]["n"],
@@ -453,13 +485,17 @@ def analytics_data(key: str = ""):
             "errors_7d":      errors_7d[0]["n"],
             "generates_7d":   generates_7d[0]["n"],
         },
-        "funnel":     funnel,
-        "by_day":     [{"day": r["day"], "count": r["n"]} for r in by_day],
-        "top_tones":  {r["tone"]: r["n"] for r in tones},
-        "top_genres": {r["genre"]: r["n"] for r in genres},
-        "top_lengths":{r["level"]: r["n"] for r in lengths},
-        "recent":     [{"session": r["session"][:8], "event": r["event"],
-                        "props": r["props"], "ts": r["ts"][:19]} for r in recent],
+        "funnel":            funnel,
+        "by_day":            [{"day": r["day"], "count": r["n"]} for r in by_day],
+        "top_tones":         {r["tone"]: r["n"] for r in tones},
+        "top_genres":        {r["genre"]: r["n"] for r in genres},
+        "top_lengths":       {r["level"]: r["n"] for r in lengths},
+        "screen_views":      screen_views,
+        "tab_counts":        tab_counts,
+        "screen_transitions":transitions,
+        "draft_save_count":  draft_saves[0]["n"],
+        "recent":            [{"session": r["session"][:8], "event": r["event"],
+                               "props": r["props"], "ts": r["ts"][:19]} for r in recent],
     }
 
 
@@ -510,6 +546,10 @@ td.ts{color:#444}
 .tag{display:inline-block;background:#1a0e12;border:1px solid #3a1520;color:#b8405a;font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px;font-family:monospace}
 .loading{color:#333;font-size:16px;text-align:center;padding:80px}
 canvas{width:100%!important}
+.flow-wrap{overflow-x:auto;padding:4px 0 4px}
+.flow-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+.flow-legend-item{display:flex;align-items:center;gap:7px;font-size:11px;color:#555}
+.flow-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -522,6 +562,15 @@ canvas{width:100%!important}
   <div class="row2">
     <div class="panel"><div class="panel-title">Customer Funnel — Last 30 Days</div><div id="funnel"></div></div>
     <div class="panel"><div class="panel-title">Events Per Day</div><canvas id="chart-days" height="180"></canvas></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Page Flow — Last 30 Days</div>
+    <div class="flow-wrap" id="flow-panel"><div class="loading" style="font-size:13px;padding:40px">Loading flow data...</div></div>
+    <div class="flow-legend">
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:#b8405a"></div>Main path</div>
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:#3d3d58"></div>Side path (Drafts / Settings)</div>
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:#1e1e2a"></div>No data yet</div>
+    </div>
   </div>
   <div class="row3">
     <div class="panel"><div class="panel-title">Top Vibes</div><div id="tones"></div></div>
@@ -613,6 +662,8 @@ async function load() {
   bars("genres", d.top_genres, null);
   bars("lengths",d.top_lengths,k=>LENGTH_LABELS[k]||k);
 
+  renderFlow(d);
+
   // Recent events
   const rows = d.recent.map(r => {
     let propsStr = "";
@@ -621,6 +672,112 @@ async function load() {
   }).join("");
   document.getElementById("recent").innerHTML =
     `<table><thead><tr><th>Event</th><th>Properties</th><th>Session</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderFlow(d) {
+  const panel = document.getElementById("flow-panel");
+  const sv    = Object.assign({}, d.screen_views || {});
+  const tabs  = d.tab_counts || {};
+  const tr    = d.screen_transitions || [];
+  const fn    = d.funnel || {};
+  const draftSaved = d.draft_save_count || 0;
+
+  // Merge tab switch counts into side nodes
+  if (!sv["screen-drafts"])   sv["screen-drafts"]   = tabs["drafts"]   || 0;
+  if (!sv["screen-settings"]) sv["screen-settings"] = tabs["settings"] || 0;
+
+  // Fallback: populate from funnel events if no screen_view data yet
+  const hasData = Object.values(sv).some(v => v > 0);
+  if (!hasData) {
+    sv["screen-welcome"]  = fn.app_open          || 0;
+    sv["screen-upload"]   = fn.file_upload       || 0;
+    sv["screen-loading"]  = fn.generate_success  || 0;
+    sv["screen-captions"] = fn.caption_select    || 0;
+    sv["screen-success"]  = fn.post_open         || 0;
+  }
+
+  const NW = 120, NH = 46, R = 8;
+  const NODES = [
+    {id:"screen-welcome",  x:10,  y:105, label:"Welcome",      main:true },
+    {id:"screen-upload",   x:150, y:105, label:"Upload",       main:true },
+    {id:"screen-loading",  x:290, y:105, label:"Loading",      main:true },
+    {id:"screen-captions", x:430, y:105, label:"Captions",     main:true },
+    {id:"screen-success",  x:570, y:105, label:"Success ✓",main:true },
+    {id:"screen-drafts",   x:150, y:15,  label:"Drafts Tab",   main:false},
+    {id:"screen-settings", x:430, y:15,  label:"Settings Tab", main:false},
+    {id:"draft-saved",     x:430, y:200, label:"Draft Saved",  main:false, fixed: draftSaved},
+  ];
+
+  const nodeMap = {};
+  NODES.forEach(n => nodeMap[n.id] = n);
+
+  const trMap = {};
+  tr.forEach(t => { trMap[t.from + "→" + t.to] = t.n; });
+
+  const counts = NODES.map(n => n.fixed !== undefined ? n.fixed : (sv[n.id]||0));
+  const maxN = Math.max(1, ...counts);
+
+  const ncx = n => n.x + NW/2;
+  const ncy = n => n.y + NH/2;
+
+  let lines = "", marks = "";
+
+  function arrow(x1, y1, x2, y2, n, side) {
+    const col = side ? "#3d3d58" : "#b8405a";
+    const alpha = n ? Math.min(0.92, Math.max(0.22, n/maxN*0.9)) : 0.1;
+    const sw = n ? Math.max(1.5, Math.min(7, n/maxN*7)) : 1.5;
+    const mid = side ? "arr-s" : "arr-m";
+    const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy)||1;
+    const ex = x2 - dx/len*9, ey = y2 - dy/len*9;
+    lines += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${col}" stroke-width="${sw.toFixed(1)}" stroke-opacity="${alpha.toFixed(2)}" marker-end="url(#${mid})"/>`;
+    if (n) {
+      const labX = ((x1+x2)/2).toFixed(1), labY = (y1===y2 ? y1-7 : (y1+y2)/2).toFixed(1);
+      lines += `<text x="${labX}" y="${labY}" fill="${col}" fill-opacity="${Math.min(1,alpha+0.25).toFixed(2)}" font-size="10" text-anchor="middle" font-family="system-ui">${n}</text>`;
+    }
+  }
+
+  // Main flow
+  const mainSeq = ["screen-welcome","screen-upload","screen-loading","screen-captions","screen-success"];
+  for (let i=0;i<mainSeq.length-1;i++) {
+    const a = nodeMap[mainSeq[i]], b = nodeMap[mainSeq[i+1]];
+    const n = trMap[a.id+"→"+b.id] || (!hasData ? (sv[b.id]||0) : 0);
+    arrow(a.x+NW+2, ncy(a), b.x-2, ncy(b), n, false);
+  }
+  // Side: Upload -> Drafts (up)
+  { const a=nodeMap["screen-upload"], b=nodeMap["screen-drafts"];
+    arrow(ncx(a), a.y, ncx(b), b.y+NH+2, sv["screen-drafts"]||0, true); }
+  // Side: Captions -> Settings (up)
+  { const a=nodeMap["screen-captions"], b=nodeMap["screen-settings"];
+    arrow(ncx(a), a.y, ncx(b), b.y+NH+2, sv["screen-settings"]||0, true); }
+  // Side: Captions -> Draft Saved (down)
+  { const a=nodeMap["screen-captions"], b=nodeMap["draft-saved"];
+    arrow(ncx(a), a.y+NH, ncx(b), b.y, draftSaved, true); }
+
+  // Nodes
+  const topN = sv["screen-welcome"] || sv["screen-upload"] || maxN || 1;
+  NODES.forEach(node => {
+    const n = node.fixed !== undefined ? node.fixed : (sv[node.id]||0);
+    const on = n > 0;
+    const fill   = node.main ? "#1a0e12" : "#111118";
+    const stroke = on ? (node.main ? "#b8405a" : "#3d3d58") : "#1a1a24";
+    const lblCol = on ? "#e8e8ea" : "#333340";
+    const cntCol = on ? (node.main ? "#d4607c" : "#5a5a80") : "#252530";
+    marks += `<rect x="${node.x}" y="${node.y}" width="${NW}" height="${NH}" rx="${R}" fill="${fill}" stroke="${stroke}" stroke-width="1.5" opacity="${on?1:0.5}"/>`;
+    marks += `<text x="${ncx(node).toFixed(1)}" y="${(node.y+16).toFixed(1)}" fill="${lblCol}" font-size="11" font-weight="700" text-anchor="middle" font-family="system-ui,-apple-system">${node.label}</text>`;
+    marks += `<text x="${ncx(node).toFixed(1)}" y="${(node.y+34).toFixed(1)}" fill="${cntCol}" font-size="15" font-weight="800" text-anchor="middle" font-family="system-ui,-apple-system">${on ? n : "—"}</text>`;
+    if (node.main && node.id !== "screen-welcome" && on) {
+      const pct = Math.round(n/topN*100);
+      marks += `<text x="${ncx(node).toFixed(1)}" y="${(node.y+NH+13).toFixed(1)}" fill="#3d3d58" font-size="9.5" text-anchor="middle" font-family="system-ui">${pct}% reach</text>`;
+    }
+  });
+
+  panel.innerHTML = `<svg viewBox="0 0 710 265" style="width:100%;min-width:360px;overflow:visible">
+    <defs>
+      <marker id="arr-m" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#b8405a"/></marker>
+      <marker id="arr-s" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#3d3d58"/></marker>
+    </defs>
+    ${lines}${marks}
+  </svg>`;
 }
 
 load();
