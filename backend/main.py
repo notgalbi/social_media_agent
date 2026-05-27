@@ -477,6 +477,24 @@ def analytics_data(key: str = ""):
         # Draft saves (last 30d unique sessions)
         draft_saves = q("SELECT COUNT(DISTINCT session) n FROM events WHERE event='draft_save' AND ts>=date('now','-30 days')")
 
+        # Tab entry points — where were users when they tapped each tab (last 30d)
+        tab_entries_raw = q("""
+            SELECT json_extract(props,'$.tab') tab,
+                   json_extract(props,'$.from') from_screen,
+                   COUNT(*) n
+            FROM events
+            WHERE event='tab_switch'
+              AND json_extract(props,'$.from') IS NOT NULL
+              AND ts >= date('now','-30 days')
+            GROUP BY tab, from_screen
+            ORDER BY tab, n DESC
+        """)
+        tab_entries = {}
+        for r in tab_entries_raw:
+            if r["tab"] not in tab_entries:
+                tab_entries[r["tab"]] = {}
+            tab_entries[r["tab"]][r["from_screen"] or "unknown"] = r["n"]
+
     return {
         "overview": {
             "sessions_today": sessions_today[0]["n"],
@@ -494,6 +512,7 @@ def analytics_data(key: str = ""):
         "tab_counts":        tab_counts,
         "screen_transitions":transitions,
         "draft_save_count":  draft_saves[0]["n"],
+        "tab_entries":       tab_entries,
         "recent":            [{"session": r["session"][:8], "event": r["event"],
                                "props": r["props"], "ts": r["ts"][:19]} for r in recent],
     }
@@ -571,6 +590,10 @@ canvas{width:100%!important}
       <div class="flow-legend-item"><div class="flow-legend-dot" style="background:#3d3d58"></div>Side path (Drafts / Settings)</div>
       <div class="flow-legend-item"><div class="flow-legend-dot" style="background:#1e1e2a"></div>No data yet</div>
     </div>
+  </div>
+  <div class="row2">
+    <div class="panel"><div class="panel-title">Settings Tab — Where Users Came From</div><div id="settings-entries"></div></div>
+    <div class="panel"><div class="panel-title">Drafts Tab — Where Users Came From</div><div id="drafts-entries"></div></div>
   </div>
   <div class="row3">
     <div class="panel"><div class="panel-title">Top Vibes</div><div id="tones"></div></div>
@@ -663,6 +686,8 @@ async function load() {
   bars("lengths",d.top_lengths,k=>LENGTH_LABELS[k]||k);
 
   renderFlow(d);
+  renderEntries("settings-entries", d.tab_entries?.settings);
+  renderEntries("drafts-entries",   d.tab_entries?.drafts);
 
   // Recent events
   const rows = d.recent.map(r => {
@@ -672,6 +697,35 @@ async function load() {
   }).join("");
   document.getElementById("recent").innerHTML =
     `<table><thead><tr><th>Event</th><th>Properties</th><th>Session</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+const SCREEN_NAMES = {
+  "screen-upload":   "Upload screen",
+  "screen-captions": "Captions screen",
+  "screen-loading":  "Loading screen",
+  "screen-success":  "Success screen",
+  "screen-drafts":   "Drafts tab",
+  "screen-settings": "Settings tab",
+  "screen-welcome":  "Welcome screen",
+};
+
+function renderEntries(elId, data) {
+  const el = document.getElementById(elId);
+  if (!data || !Object.keys(data).length) {
+    el.innerHTML = '<div style="color:#333;padding:12px 0;font-size:13px">No data yet — will populate once users open the app after this deploy.</div>';
+    return;
+  }
+  const sorted = Object.entries(data).sort((a,b) => b[1]-a[1]);
+  const max = Math.max(1, ...sorted.map(([,v])=>v));
+  el.innerHTML = sorted.map(([screen, n]) => {
+    const label = SCREEN_NAMES[screen] || screen;
+    const pct = Math.round(n/max*100);
+    return `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="bar-count">${n}</div>
+    </div>`;
+  }).join("");
 }
 
 function renderFlow(d) {

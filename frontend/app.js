@@ -427,6 +427,7 @@ function showScreen(id) {
   void next.offsetWidth;
   next.classList.add("enter");
   if (CREATE_SCREENS.has(id)) lastCreateScreen = id;
+  currentScreen = id;
   track("screen_view", { screen: id });
 }
 
@@ -627,6 +628,7 @@ document.getElementById("btn-try-now").addEventListener("click", () => {
 
 let activeTab = "create";
 let lastCreateScreen = "screen-upload";
+let currentScreen = "screen-upload";
 
 function setActiveTab(tab) {
   activeTab = tab;
@@ -668,7 +670,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
       loadSettingsData();
     }
     playSound("click");
-    track("tab_switch", { tab });
+    track("tab_switch", { tab, from: currentScreen });
   });
 });
 
